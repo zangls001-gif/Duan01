@@ -1,0 +1,6 @@
+{
+  "name": "HostingAdvisor - AI Hosting & Domain E-Commerce OMS",
+  "description": "Nền tảng thương mại điện tử đăng ký Hosting & Tên miền tốc độ cao, tư vấn bằng AI, thanh toán VietQR động và quản trị đơn hàng (OMS).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,399 @@
+{
+  "supabase_config": {
+    "url": "https://ktovjbetgforctvxfxny.supabase.co",
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0b3ZqYmV0Z2ZvcmN0dnhmeG55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzNjI2MDMsImV4cCI6MjA5NjkzODYwM30.i4u8v37qRDZMyOWeqJl6vcJj2MqrIzqszUZSGZsazNA",
+    "syncEnabled": true,
+    "status": "connected",
+    "lastTestedAt": "2026-10-30T09:00:00.000Z",
+    "detectedTables": [
+      "users",
+      "photos",
+      "trips"
+    ]
+  },
+  "users": [
+    {
+      "id": "usr_admin",
+      "username": "admin",
+      "password": "admin123@password",
+      "fullName": "Nguyễn Quản Trị",
+      "phone": "0901000001",
+      "email": "admin@hostingadvisor.vn",
+      "role": "admin",
+      "createdAt": "2026-01-01T08:00:00.000Z"
+    },
+    {
+      "id": "usr_staff",
+      "username": "staff",
+      "password": "staff123@password",
+      "fullName": "Trần Tư Vấn",
+      "phone": "0901000002",
+      "email": "staff@hostingadvisor.vn",
+      "role": "staff",
+      "createdAt": "2026-01-01T08:30:00.000Z"
+    },
+    {
+      "id": "usr_cust_01",
+      "username": "hoangyen",
+      "password": "123456@password",
+      "fullName": "Lê Hoàng Yến",
+      "phone": "0988123456",
+      "email": "hoangyen.boutique@gmail.com",
+      "role": "customer",
+      "createdAt": "2026-10-26T08:00:00.000Z"
+    }
+  ],
+  "coupons": [
+    {
+      "code": "VIBE2026",
+      "type": "percent",
+      "value": 15,
+      "description": "Giảm ngay 15% tổng hóa đơn nhân dịp Vibe Coding 2026"
+    },
+    {
+      "code": "CHUSHOP",
+      "type": "fixed",
+      "value": 50000,
+      "description": "Ưu đãi trực tiếp 50.000đ cho chủ shop khởi nghiệp"
+    }
+  ],
+  "addons": [
+    {
+      "id": "addon_whois",
+      "name": "Bảo Vệ Ẩn Danh Tên Miền (Whois Privacy)",
+      "price": 50000,
+      "billingType": "yearly",
+      "description": "Ẩn thông tin cá nhân và SĐT của bạn trên dữ liệu công khai Whois"
+    },
+    {
+      "id": "addon_backup",
+      "name": "Sao Lưu Dữ Liệu Tự Động Hằng Ngày (Daily Backup)",
+      "price": 30000,
+      "billingType": "monthly",
+      "description": "Tự động sao lưu website vào 0h mỗi đêm, khôi phục với 1 click"
+    },
+    {
+      "id": "addon_ip",
+      "name": "Địa Chỉ IP Riêng Chuyên Dụng (Dedicated IP)",
+      "price": 80000,
+      "billingType": "monthly",
+      "description": "IP độc lập giúp uy tín email và tối ưu SEO vượt trội"
+    }
+  ],
+  "domain_pricing": [
+    {
+      "extension": ".com",
+      "price": 280000,
+      "description": "Tên miền quốc tế phổ biến nhất",
+      "badge": "Phổ biến"
+    },
+    {
+      "extension": ".vn",
+      "price": 550000,
+      "description": "Tên miền quốc gia Việt Nam uy tín",
+      "badge": "Khuyên dùng"
+    },
+    {
+      "extension": ".com.vn",
+      "price": 450000,
+      "description": "Doanh nghiệp thương mại Việt Nam",
+      "badge": "Doanh nghiệp"
+    },
+    {
+      "extension": ".shop",
+      "price": 190000,
+      "description": "Cửa hàng bán lẻ trực tuyến",
+      "badge": "E-Commerce"
+    }
+  ],
+  "plans": [
+    {
+      "id": "starter",
+      "name": "Starter",
+      "type": "Shared Hosting",
+      "pricePerMonth": 39000,
+      "storage": "5 GB SSD",
+      "bandwidth": "50 GB/tháng",
+      "recommendedVisits": 3000,
+      "freeDomain": false,
+      "features": [
+        "1 website",
+        "SSL miễn phí",
+        "1 email doanh nghiệp",
+        "Bảng điều khiển cPanel",
+        "Hỗ trợ 24/7"
+      ],
+      "limitations": "Không tặng kèm tên miền, dung lượng cho trang nhỏ",
+      "bestFor": "Blog cá nhân, trang giới thiệu nhỏ"
+    },
+    {
+      "id": "basic",
+      "name": "Basic",
+      "type": "Shared Hosting",
+      "pricePerMonth": 69000,
+      "storage": "20 GB SSD",
+      "bandwidth": "200 GB/tháng",
+      "recommendedVisits": 10000,
+      "freeDomain": true,
+      "features": [
+        "3 website",
+        "SSL miễn phí",
+        "Tặng tên miền .com/.vn năm đầu",
+        "5 email doanh nghiệp",
+        "Sao lưu hàng tuần"
+      ],
+      "limitations": "Phù hợp dưới 10.000 truy cập/tháng",
+      "bestFor": "Trang giới thiệu doanh nghiệp, shop nhỏ mới bắt đầu"
+    },
+    {
+      "id": "business",
+      "name": "Business",
+      "type": "Shared Hosting",
+      "pricePerMonth": 129000,
+      "storage": "50 GB NVMe",
+      "bandwidth": "Không giới hạn",
+      "recommendedVisits": 30000,
+      "freeDomain": true,
+      "features": [
+        "10 website",
+        "SSL miễn phí",
+        "Tặng tên miền năm đầu",
+        "Sao lưu hằng tuần",
+        "Tăng tốc LiteSpeed Enterprise",
+        "Không giới hạn băng thông"
+      ],
+      "limitations": "Chia sẻ tài nguyên CPU/RAM với server chung",
+      "bestFor": "Shop online vừa, nhiều ảnh sản phẩm"
+    },
+    {
+      "id": "shop-pro",
+      "name": "Shop Pro",
+      "type": "Cloud Hosting",
+      "pricePerMonth": 249000,
+      "storage": "100 GB NVMe",
+      "bandwidth": "Không giới hạn",
+      "recommendedVisits": 80000,
+      "freeDomain": true,
+      "features": [
+        "Tối ưu WooCommerce",
+        "Sao lưu hằng ngày",
+        "CDN Cloudflare Enterprise",
+        "Tặng tên miền năm đầu",
+        "Hỗ trợ kỹ thuật VIP ưu tiên"
+      ],
+      "limitations": "Chi phí cao hơn shared thông thường",
+      "bestFor": "Shop bán hàng đông khách, có chạy quảng cáo"
+    },
+    {
+      "id": "vps-1",
+      "name": "VPS Growth",
+      "type": "VPS",
+      "pricePerMonth": 399000,
+      "storage": "80 GB NVMe",
+      "bandwidth": "1 TB/tháng",
+      "recommendedVisits": 150000,
+      "freeDomain": false,
+      "features": [
+        "2 CPU, 4 GB RAM",
+        "Toàn quyền quản trị Root",
+        "Sao lưu hằng ngày",
+        "Tự cài phần mềm theo ý",
+        "Tốc độ mạng 1 Gbps"
+      ],
+      "limitations": "Cần kiến thức quản trị máy chủ cơ bản",
+      "bestFor": "Website lượng truy cập cao, cần tuỳ biến sâu"
+    },
+    {
+      "id": "vps-2",
+      "name": "VPS Power",
+      "type": "VPS",
+      "pricePerMonth": 799000,
+      "storage": "160 GB NVMe",
+      "bandwidth": "3 TB/tháng",
+      "recommendedVisits": 500000,
+      "freeDomain": false,
+      "features": [
+        "4 CPU, 8 GB RAM",
+        "Toàn quyền quản trị Root",
+        "Sao lưu hằng ngày",
+        "IP riêng độc lập",
+        "Cam kết Uptime 99.99%"
+      ],
+      "limitations": "Cần nhân sự kỹ thuật quản trị hệ điều hành",
+      "bestFor": "Báo điện tử, sàn thương mại, lượng truy cập lớn"
+    }
+  ],
+  "orders": [
+    {
+      "id": "ORD-2026-003",
+      "customerId": "guest_1793378574642",
+      "customerName": "Nguyễn Văn Hùng",
+      "phone": "0912345678",
+      "email": "hung@gmail.com",
+      "planChosen": "basic",
+      "planName": "Basic",
+      "planPrice": 69000,
+      "domainName": "phuongnamtech.vn",
+      "domainExtension": ".vn",
+      "domainPrice": 0,
+      "isDomainFree": true,
+      "billingCycleMonths": 12,
+      "addons": [],
+      "couponApplied": null,
+      "discountAmount": 0,
+      "subTotal": 828000,
+      "totalAmount": 828000,
+      "qrUrl": "https://img.vietqr.io/image/MB-0988123456-compact2.png?amount=828000&addInfo=ORD-2026-003&accountName=HOSTING%20ADVISOR%20CORP",
+      "paymentMethod": "vietqr",
+      "paymentStatus": "paid_processing",
+      "status": "paid_processing",
+      "assignedTo": null,
+      "assignedToName": "Chưa phân công",
+      "serviceDetails": null,
+      "needs": null,
+      "aiReason": "",
+      "aiDomainAdvice": "",
+      "notes": "",
+      "timeline": [
+        {
+          "action": "Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR",
+          "by": "khach_hang",
+          "time": "2026-10-30T16:42:54.642Z"
+        },
+        {
+          "action": "Khách hàng xác nhận đã chuyển khoản VietQR, đang chờ duyệt tiền",
+          "by": "khach_hang",
+          "time": "2026-10-30T16:42:55.332Z"
+        }
+      ],
+      "createdAt": "2026-10-30T16:42:54.642Z",
+      "updatedAt": "2026-10-30T16:42:55.332Z"
+    },
+    {
+      "id": "ORD-2026-002",
+      "customerId": "usr_cust_01",
+      "customerName": "Lê Hoàng Yến",
+      "phone": "0988123456",
+      "email": "hoangyen.boutique@gmail.com",
+      "planChosen": "business",
+      "planName": "Business",
+      "planPrice": 129000,
+      "domainName": "yenboutique.vn",
+      "domainExtension": ".vn",
+      "domainPrice": 0,
+      "isDomainFree": true,
+      "billingCycleMonths": 12,
+      "addons": [
+        {
+          "id": "addon_whois",
+          "name": "Bảo Vệ Ẩn Danh Tên Miền (Whois Privacy)",
+          "price": 50000
+        }
+      ],
+      "couponApplied": "VIBE2026",
+      "discountAmount": 239700,
+      "subTotal": 1598000,
+      "totalAmount": 1358300,
+      "qrUrl": "https://img.vietqr.io/image/MB-0988123456-compact2.png?amount=1358300&addInfo=ORD-2026-002&accountName=HOSTING%20ADVISOR%20CORP",
+      "paymentMethod": "vietqr",
+      "paymentStatus": "paid",
+      "status": "completed",
+      "assignedTo": null,
+      "assignedToName": "Chưa phân công",
+      "serviceDetails": {
+        "hostingIp": "103.145.62.56",
+        "nameServers": [
+          "ns1.hostingadvisor.vn",
+          "ns2.hostingadvisor.vn"
+        ],
+        "expireDate": "2027-10-25T15:17:37.508Z"
+      },
+      "needs": null,
+      "aiReason": "",
+      "aiDomainAdvice": "",
+      "notes": "",
+      "timeline": [
+        {
+          "action": "Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR",
+          "by": "hoangyen",
+          "time": "2026-10-30T15:17:33.027Z"
+        },
+        {
+          "action": "Xác nhận nhận đủ 1.358.300đ & Kích hoạt gói dịch vụ",
+          "by": "admin",
+          "time": "2026-10-30T15:17:37.508Z"
+        }
+      ],
+      "createdAt": "2026-10-30T15:17:33.027Z",
+      "updatedAt": "2026-10-30T15:17:37.508Z"
+    },
+    {
+      "id": "ORD-2026-001",
+      "customerId": "usr_cust_01",
+      "customerName": "Lê Hoàng Yến",
+      "phone": "0988123456",
+      "email": "hoangyen.boutique@gmail.com",
+      "planChosen": "business",
+      "planName": "Business",
+      "planPrice": 129000,
+      "domainName": "yenboutique.vn",
+      "domainExtension": ".vn",
+      "domainPrice": 550000,
+      "isDomainFree": true,
+      "billingCycleMonths": 12,
+      "addons": [
+        {
+          "id": "addon_whois",
+          "name": "Bảo Vệ Ẩn Danh Tên Miền (Whois Privacy)",
+          "price": 50000
+        }
+      ],
+      "couponApplied": "VIBE2026",
+      "discountAmount": 239700,
+      "subTotal": 1598000,
+      "totalAmount": 1358300,
+      "paymentMethod": "vietqr",
+      "paymentStatus": "paid",
+      "status": "completed",
+      "assignedTo": "usr_staff",
+      "assignedToName": "Trần Tư Vấn",
+      "serviceDetails": {
+        "hostingIp": "103.145.62.88",
+        "nameServers": [
+          "ns1.hostingadvisor.vn",
+          "ns2.hostingadvisor.vn"
+        ],
+        "expireDate": "2027-10-26T08:15:00.000Z"
+      },
+      "needs": {
+        "siteType": "ban-hang",
+        "traffic": "10k-50k",
+        "budget": 150000,
+        "needDomain": true,
+        "desiredDomain": "yenboutique"
+      },
+      "aiReason": "Gói Business đáp ứng thoải mái 30.000 khách mỗi tháng, tặng kèm tên miền .vn bảo vệ thương hiệu thời trang tại Việt Nam.",
+      "aiDomainAdvice": "Tên miền .vn giúp khách hàng an tâm mua sắm online, ưu tiên SEO tại Việt Nam.",
+      "notes": "Đã nhận tiền chuyển khoản lúc 08:30 và kích hoạt dịch vụ thành công",
+      "timeline": [
+        {
+          "action": "Khách đặt mua gói và áp dụng mã VIBE2026",
+          "by": "hoangyen",
+          "time": "2026-10-26T08:15:00.000Z"
+        },
+        {
+          "action": "Khách xác nhận đã chuyển khoản VietQR",
+          "by": "hoangyen",
+          "time": "2026-10-26T08:25:00.000Z"
+        },
+        {
+          "action": "Xác nhận nhận đủ tiền 1.358.300đ & Kích hoạt gói dịch vụ",
+          "by": "admin",
+          "time": "2026-10-26T08:30:00.000Z"
+        }
+      ],
+      "createdAt": "2026-10-26T08:15:00.000Z",
+      "updatedAt": "2026-10-26T08:30:00.000Z"
+    }
+  ]
+}
