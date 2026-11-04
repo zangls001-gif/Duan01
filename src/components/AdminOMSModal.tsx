@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Order, User, SupabaseStatus } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../data/supabaseClient';
 import {
   X,
   ShieldCheck,
@@ -71,16 +72,77 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/orders', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Không thể tải danh sách đơn');
+      let fetched: Order[] | null = null;
+      try {
+        const res = await fetch('/api/orders', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data && data.ok) {
+            fetched = data.orders || [];
+          }
+        }
+      } catch {}
+
+      // Fallback to Supabase orders table directly
+      if (!fetched) {
+        try {
+          const { data: supaOrders, error: sErr } = await supabase
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!sErr && Array.isArray(supaOrders) && supaOrders.length > 0) {
+            fetched = supaOrders.map((o) => ({
+              id: o.id,
+              customerId: o.customer_id || 'guest',
+              customerName: o.customer_name || 'Khách hàng',
+              phone: o.phone || '',
+              email: o.email || '',
+              planChosen: o.plan_chosen || '',
+              planName: o.plan_name || 'Gói dịch vụ',
+              planPrice: 0,
+              domainName: o.domain_name || '',
+              domainExtension: '',
+              domainPrice: 0,
+              isDomainFree: false,
+              billingCycleMonths: o.billing_cycle_months || 12,
+              addons: [],
+              couponApplied: null,
+              discountAmount: 0,
+              subTotal: o.total_amount || 0,
+              totalAmount: o.total_amount || 0,
+              qrUrl: '',
+              paymentMethod: 'vietqr',
+              paymentStatus: o.payment_status || 'paid_processing',
+              status: o.status || 'paid_processing',
+              assignedTo: null,
+              assignedToName: 'Chưa phân công',
+              serviceDetails: null,
+              notes: o.notes || null,
+              timeline: Array.isArray(o.timeline) ? o.timeline : [],
+              createdAt: o.created_at || new Date().toISOString(),
+              updatedAt: o.updated_at || new Date().toISOString()
+            }));
+          }
+        } catch {}
       }
-      setOrders(data.orders || []);
+
+      // Final fallback to localStorage
+      if (!fetched) {
+        try {
+          const stored = localStorage.getItem('ha_orders');
+          fetched = stored ? JSON.parse(stored) : [];
+        } catch {
+          fetched = [];
+        }
+      }
+
+      setOrders(fetched || []);
     } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối máy chủ');
+      setError(err.message || 'Lỗi kết nối');
     } finally {
       setIsLoading(false);
     }

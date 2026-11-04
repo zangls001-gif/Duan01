@@ -45,11 +45,15 @@ function getAiClient(): GoogleGenAI | null {
   });
 }
 
-// Database Helpers
+// Database Helpers (supports read-only serverless filesystems like Vercel)
+let inMemoryDB: any = null;
+
 async function readDB() {
+  if (inMemoryDB) return inMemoryDB;
   try {
     const data = await fs.readFile(DB_FILE, 'utf-8');
-    return JSON.parse(data);
+    inMemoryDB = JSON.parse(data);
+    return inMemoryDB;
   } catch (err) {
     console.error('Error reading db.json:', err);
     throw err;
@@ -57,7 +61,12 @@ async function readDB() {
 }
 
 async function writeDB(data: any) {
-  await fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  inMemoryDB = data;
+  try {
+    await fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (err) {
+    console.warn('Read-only filesystem detected, maintaining in memory:', err);
+  }
 }
 
 // Supabase Helpers
@@ -1190,7 +1199,12 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
+if (!process.env.VERCEL) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  });
+}
+
+export default app;
+export { app };

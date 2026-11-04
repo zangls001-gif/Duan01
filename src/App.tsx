@@ -50,16 +50,22 @@ function AppContent() {
   // Fetch official data from backend on load
   useEffect(() => {
     fetch('/api/data')
-      .then((res) => res.json())
+      .then(async (res) => {
+        const ct = res.headers.get('content-type') || '';
+        if (res.ok && ct.includes('application/json')) {
+          return res.json();
+        }
+        return null;
+      })
       .then((data) => {
-        if (data.ok) {
+        if (data && data.ok) {
           if (data.plans && data.plans.length > 0) setPlans(data.plans);
           if (data.domain_pricing && data.domain_pricing.length > 0) setDomains(data.domain_pricing);
           if (data.addons && data.addons.length > 0) setAddons(data.addons);
         }
       })
-      .catch((err) => {
-        console.warn('Using local fallback data:', err);
+      .catch(() => {
+        // Keeps local initial data smoothly
       });
   }, []);
 

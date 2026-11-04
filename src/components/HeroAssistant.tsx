@@ -3,9 +3,11 @@ import {
   SITE_TYPE_OPTIONS,
   TRAFFIC_OPTIONS,
   BUDGET_OPTIONS,
-  INITIAL_DOMAINS
+  INITIAL_DOMAINS,
+  INITIAL_PLANS
 } from '../data/constants';
 import { Needs, AIAdviceData } from '../types';
+import { getClientRuleBasedRecommendation } from '../utils/aiAdvisorEngine';
 import {
   Sparkles,
   Building2,
@@ -130,21 +132,40 @@ export const HeroAssistant: React.FC<HeroAssistantProps> = ({
     };
 
     try {
-      const response = await fetch('/api/advice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ needs: needsPayload })
-      });
+      let adviceResult: any = null;
+      let source = 'ai';
 
-      const data = await response.json();
+      try {
+        const response = await fetch('/api/advice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ needs: needsPayload })
+        });
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Không thể lấy kết quả phân tích');
+        const contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.includes('application/json')) {
+          const data = await response.json();
+          if (data && data.ok && data.data) {
+            adviceResult = data.data;
+            source = data.source || 'ai';
+          }
+        }
+      } catch (networkErr) {
+        // Backend not available (e.g. running as static deployment on Vercel)
+        console.warn('API advice route not available, using smart local advisor:', networkErr);
       }
 
-      onAnalyzeSuccess(data.data, needsPayload, data.source || 'ai');
+      // If backend returned 404/HTML (e.g. Vercel static hosting) or failed, use smart client-side engine!
+      if (!adviceResult) {
+        adviceResult = getClientRuleBasedRecommendation(INITIAL_PLANS, needsPayload);
+        source = 'smart-advisor';
+      }
+
+      onAnalyzeSuccess(adviceResult, needsPayload, source);
     } catch (err: any) {
-      setErrorMessage('Lỗi khi phân tích nhu cầu: ' + err.message);
+      // Guaranteed safety: even in catastrophic case, generate recommendation
+      const fallbackResult = getClientRuleBasedRecommendation(INITIAL_PLANS, needsPayload);
+      onAnalyzeSuccess(fallbackResult, needsPayload, 'smart-advisor');
     } finally {
       setIsLoading(false);
     }

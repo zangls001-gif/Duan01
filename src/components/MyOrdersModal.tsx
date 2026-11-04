@@ -34,14 +34,31 @@ export const MyOrdersModal: React.FC<MyOrdersModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/orders/my-orders', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Không thể tải danh sách đơn');
+      let fetched: Order[] | null = null;
+      try {
+        const res = await fetch('/api/orders/my-orders', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data && data.ok) {
+            fetched = data.orders || [];
+          }
+        }
+      } catch {}
+
+      if (!fetched) {
+        // Fallback to locally stored orders for Vercel / offline
+        try {
+          const stored = localStorage.getItem('ha_orders');
+          fetched = stored ? JSON.parse(stored) : [];
+        } catch {
+          fetched = [];
+        }
       }
-      setOrders(data.orders || []);
+
+      setOrders(fetched || []);
     } catch (err: any) {
       setError(err.message || 'Lỗi kết nối máy chủ');
     } finally {

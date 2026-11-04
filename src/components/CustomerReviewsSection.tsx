@@ -9,6 +9,7 @@ import {
   Clock,
   ShieldCheck
 } from 'lucide-react';
+import { supabase } from '../data/supabaseClient';
 
 export interface CustomerReview {
   id: string;
@@ -51,41 +52,42 @@ export const CustomerReviewsSection: React.FC = () => {
   // Real-time server sync function
   const syncWithServer = async () => {
     try {
-      const res = await fetch('/api/reviews');
-      const data = await res.json();
-      if (data.ok && Array.isArray(data.reviews)) {
-        const serverReviews: CustomerReview[] = data.reviews;
+      let fetchedReviews: CustomerReview[] | null = null;
 
-        // Check if local cache has any reviews not yet present on server, and push them to server
-        const localCacheStr = localStorage.getItem(STORAGE_KEY);
-        if (localCacheStr) {
-          try {
-            const localCache: CustomerReview[] = JSON.parse(localCacheStr);
-            if (Array.isArray(localCache)) {
-              for (const localRev of localCache) {
-                const onServer = serverReviews.some(
-                  (sr) => sr.id === localRev.id || (sr.full_name === localRev.full_name && sr.review_content === localRev.review_content)
-                );
-                if (!onServer && localRev.full_name && localRev.review_content) {
-                  // Upload to server so all devices see it
-                  fetch('/api/reviews', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(localRev)
-                  }).catch(() => {});
-                }
-              }
-            }
-          } catch {}
+      // 1. Try local Express API if available
+      try {
+        const res = await fetch('/api/reviews');
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.reviews)) {
+            fetchedReviews = data.reviews;
+          }
         }
+      } catch {}
 
-        setReviews(serverReviews);
+      // 2. If running on Vercel static or offline, query Supabase directly
+      if (!fetchedReviews) {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverReviews));
+          const { data: supaReviews, error } = await supabase
+            .from('reviews')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(supaReviews) && supaReviews.length > 0) {
+            fetchedReviews = supaReviews;
+          }
+        } catch {}
+      }
+
+      if (fetchedReviews && fetchedReviews.length > 0) {
+        setReviews(fetchedReviews);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(fetchedReviews));
         } catch {}
       }
     } catch (err) {
-      console.warn('Real-time reviews sync check:', err);
+      console.warn('Real-time reviews sync notice:', err);
     }
   };
 
@@ -178,9 +180,24 @@ export const CustomerReviewsSection: React.FC = () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newRev)
-    }).catch((err) => {
-      console.warn('Background review sync error:', err);
-    });
+    }).catch(() => {});
+
+    // Đồng bộ trực tiếp tới Supabase (đảm bảo hiển thị và lưu trữ trên mọi môi trường như Vercel)
+    (async () => {
+      try {
+        await supabase.from('reviews').insert([
+          {
+            id: newRev.id,
+            full_name: newRev.full_name,
+            website_name: newRev.website_name || '',
+            service_package: newRev.service_package,
+            rating: newRev.rating,
+            review_content: newRev.review_content,
+            created_at: newRev.created_at
+          }
+        ]);
+      } catch {}
+    })();
   };
 
   const formatReviewDate = (isoString?: string) => {
