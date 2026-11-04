@@ -152,7 +152,14 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
         body: JSON.stringify(payload)
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        throw new Error('Máy chủ đang bận hoặc khởi động lại. Vui lòng bấm thử lại sau 1-2 giây!');
+      }
+
       if (!res.ok || !data.ok) {
         throw new Error(data.error || 'Không thể gửi yêu cầu tư vấn');
       }
@@ -160,7 +167,7 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
       setCreatedRegOrder(data.order);
       setRegSuccess(true);
     } catch (err: any) {
-      setRegError('Lỗi gửi yêu cầu tư vấn: ' + err.message);
+      setRegError('Lỗi gửi yêu cầu tư vấn: ' + (err.message || 'Vui lòng thử lại'));
     } finally {
       setIsSubmittingReg(false);
     }

@@ -48,6 +48,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [token]);
 
+  const safeParseResponse = async (res: Response) => {
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        return await res.json();
+      } catch {
+        return { ok: false, error: 'Dữ liệu phản hồi không đúng định dạng JSON' };
+      }
+    }
+    const text = await res.text();
+    if (res.status === 502 || res.status === 503 || res.status === 504 || text.includes('page c') || text.includes('The page') || text.includes('<!DOCTYPE')) {
+      return {
+        ok: false,
+        error: 'Máy chủ đang trong quá trình kết nối lại hoặc khởi động. Vui lòng bấm thử lại trong 1-2 giây!'
+      };
+    }
+    return { ok: false, error: `Máy chủ phản hồi mã lỗi ${res.status}. Vui lòng thử lại!` };
+  };
+
   const login = async (username: string, password: string) => {
     setIsLoading(true);
     try {
@@ -56,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
-      const data = await res.json();
+      const data = await safeParseResponse(res);
       if (!res.ok || !data.ok) {
         return { success: false, error: data.error || 'Đăng nhập không thành công' };
       }
@@ -68,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: 'Lỗi kết nối máy chủ: ' + err.message };
+      return { success: false, error: 'Lỗi kết nối máy chủ: ' + (err.message || 'Vui lòng thử lại') };
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
       });
-      const data = await res.json();
+      const data = await safeParseResponse(res);
       if (!res.ok || !data.ok) {
         return { success: false, error: data.error || 'Đăng ký không thành công' };
       }
@@ -94,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAuthModalOpen(false);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: 'Lỗi kết nối máy chủ: ' + err.message };
+      return { success: false, error: 'Lỗi kết nối máy chủ: ' + (err.message || 'Vui lòng thử lại') };
     } finally {
       setIsLoading(false);
     }
