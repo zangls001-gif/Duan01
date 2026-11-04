@@ -67,6 +67,7 @@ export interface Needs {
   budget: number;
   needDomain: boolean;
   desiredDomain: string;
+  brandName?: string;
   notes?: string;
 }
 

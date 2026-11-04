@@ -225,6 +225,46 @@
   ],
   "orders": [
     {
+      "id": "ORD-2026-004",
+      "customerId": "guest_1793616065917",
+      "customerName": "Test Nguyen",
+      "phone": "0988777666",
+      "email": "khachhang@example.com",
+      "planChosen": "basic",
+      "planName": "Basic",
+      "planPrice": 69000,
+      "domainName": "",
+      "domainExtension": "",
+      "domainPrice": 0,
+      "isDomainFree": false,
+      "billingCycleMonths": 12,
+      "addons": [],
+      "couponApplied": null,
+      "discountAmount": 0,
+      "subTotal": 828000,
+      "totalAmount": 828000,
+      "qrUrl": "https://img.vietqr.io/image/MB-0988123456-compact2.png?amount=828000&addInfo=ORD-2026-004&accountName=HOSTING%20ADVISOR%20CORP",
+      "paymentMethod": "vietqr",
+      "paymentStatus": "unpaid",
+      "status": "pending_payment",
+      "assignedTo": null,
+      "assignedToName": "Chưa phân công",
+      "serviceDetails": null,
+      "needs": null,
+      "aiReason": "",
+      "aiDomainAdvice": "",
+      "notes": "",
+      "timeline": [
+        {
+          "action": "Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR",
+          "by": "khach_hang",
+          "time": "2026-11-02T10:41:05.917Z"
+        }
+      ],
+      "createdAt": "2026-11-02T10:41:05.917Z",
+      "updatedAt": "2026-11-02T10:41:05.917Z"
+    },
+    {
       "id": "ORD-2026-003",
       "customerId": "guest_1793378574642",
       "customerName": "Nguyễn Văn Hùng",
@@ -394,6 +434,44 @@
       ],
       "createdAt": "2026-10-26T08:15:00.000Z",
       "updatedAt": "2026-10-26T08:30:00.000Z"
+    }
+  ],
+  "customer_reviews": [
+    {
+      "id": "rev_real_01",
+      "full_name": "A",
+      "website_name": "AKA",
+      "service_package": "Gói Business Hosting",
+      "rating": 5,
+      "review_content": "Very Good",
+      "created_at": "2026-11-03T10:00:00.000Z"
+    },
+    {
+      "id": "rev_real_02",
+      "full_name": "AAA",
+      "website_name": "LALII",
+      "service_package": "Gói Business Hosting",
+      "rating": 5,
+      "review_content": "Rất tốt",
+      "created_at": "2026-11-03T09:45:00.000Z"
+    },
+    {
+      "id": "rev_real_03",
+      "full_name": "AAA",
+      "website_name": "LALII",
+      "service_package": "Gói Business Hosting",
+      "rating": 5,
+      "review_content": "Rất tốt",
+      "created_at": "2026-11-03T09:30:00.000Z"
+    },
+    {
+      "id": "rev_real_04",
+      "full_name": "AAA",
+      "website_name": "LALII",
+      "service_package": "Gói Business Hosting",
+      "rating": 5,
+      "review_content": "Các gói rất tốt và tiện lợi",
+      "created_at": "2026-11-03T09:15:00.000Z"
     }
   ]
 }

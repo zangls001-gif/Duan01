@@ -12,6 +12,7 @@ import { PlansCatalog } from './components/PlansCatalog';
 import { DomainPricingSection } from './components/DomainPricingSection';
 import { TrustAndReviews } from './components/TrustAndReviews';
 import { CustomerReviewsSection } from './components/CustomerReviewsSection';
+import { FaqSection } from './components/FaqSection';
 import { Footer } from './components/Footer';
 import { AuthModal } from './components/AuthModal';
 import { CheckoutModal } from './components/CheckoutModal';
@@ -36,6 +37,7 @@ function AppContent() {
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [checkoutDomainName, setCheckoutDomainName] = useState<string>('');
   const [checkoutDomainExt, setCheckoutDomainExt] = useState<string>('.com');
+  const [checkoutInitialAddonIds, setCheckoutInitialAddonIds] = useState<string[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
 
   // Invoice Modal State
@@ -87,20 +89,31 @@ function AppContent() {
   };
 
   // Triggered when user selects a plan from AI results or from Catalog
-  const handleOpenCheckoutWithPlan = (plan: Plan, domName: string = '', domExt: string = '.com') => {
+  const handleOpenCheckoutWithPlan = (
+    plan: Plan,
+    domName: string = '',
+    domExt: string = '.com',
+    initialAddons: string[] = []
+  ) => {
     setCheckoutPlan(plan);
     setCheckoutDomainName(domName);
     setCheckoutDomainExt(domExt);
+    setCheckoutInitialAddonIds(initialAddons);
     setIsCheckoutOpen(true);
   };
 
   // Triggered when user picks a domain from Domain Section
-  const handleSelectDomainForCheckout = (domainName: string, ext: string) => {
+  const handleSelectDomainForCheckout = (
+    domainName: string,
+    ext: string,
+    initialAddons: string[] = []
+  ) => {
     // If the domain is eligible for free domain with Basic (69k), let's default to Basic
     const recommendedPlan = plans.find((p) => p.id === 'basic') || plans[0];
     setCheckoutPlan(recommendedPlan);
     setCheckoutDomainName(domainName);
     setCheckoutDomainExt(ext);
+    setCheckoutInitialAddonIds(initialAddons);
     setIsCheckoutOpen(true);
   };
 
@@ -136,7 +149,8 @@ function AppContent() {
         {/* 4. Official Product Catalog (6 Plans - Section 4.1 & Section 0) */}
         <PlansCatalog
           plans={plans}
-          onBuyPlan={(plan) => handleOpenCheckoutWithPlan(plan)}
+          addons={addons}
+          onBuyPlan={(plan, selectedAddons) => handleOpenCheckoutWithPlan(plan, '', '.com', selectedAddons)}
         />
 
         {/* 5. Brand Domain Pricing & Interactive Search (Section 6) */}
@@ -146,14 +160,17 @@ function AppContent() {
           onSelectDomainForCheckout={handleSelectDomainForCheckout}
         />
 
-        {/* 6. Trust Badges, Reviews & FAQ (Section 4.5) */}
+        {/* 6. Trust Badges & Reviews */}
         <TrustAndReviews />
 
-        {/* 7. Đánh Giá Thực Tế Từ Khách Hàng & Form Gửi Đánh Giá (Nhiệm vụ mới) */}
+        {/* 7. Đánh Giá Thực Tế Từ Khách Hàng & Form Gửi Đánh Giá */}
         <CustomerReviewsSection />
+
+        {/* 8. Giải Đáp Thắc Mắc - Câu Hỏi Thường Gặp (FAQ) - Đặt gần cuối trang dưới phần gửi đánh giá */}
+        <FaqSection />
       </main>
 
-      {/* 8. Footer */}
+      {/* 9. Footer */}
       <Footer />
 
       {/* 8. Global Modals */}
@@ -170,6 +187,7 @@ function AppContent() {
         addons={addons}
         initialDomainName={checkoutDomainName}
         initialDomainExt={checkoutDomainExt}
+        initialAddonIds={checkoutInitialAddonIds}
         onOrderCreated={(newOrder) => {
           // Keep modal open on success screen or view invoice
         }}

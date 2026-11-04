@@ -10,60 +10,25 @@ export interface SiteTypeOption {
 
 export const SITE_TYPE_OPTIONS: SiteTypeOption[] = [
   {
-    id: 'doanh-nghiep',
-    title: 'Website Doanh Nghiệp',
-    description: 'Giới thiệu công ty, hồ sơ năng lực, dịch vụ chuyên nghiệp',
-    iconName: 'Building2',
-    recommendedTag: 'Phổ biến'
-  },
-  {
     id: 'ban-hang',
-    title: 'Bán Hàng & E-Commerce',
-    description: 'Cửa hàng trực tuyến, giỏ hàng, thanh toán và nhiều sản phẩm',
+    title: 'Bán hàng',
+    description: 'Giỏ hàng, nhiều sản phẩm, thanh toán.',
     iconName: 'ShoppingCart',
-    recommendedTag: 'Khuyên dùng'
+    recommendedTag: ''
   },
   {
-    id: 'tin-tuc',
-    title: 'Blog & Tin Tức',
-    description: 'Chia sẻ kiến thức, bài viết, tạp chí, lượng đọc lớn',
+    id: 'gioi-thieu',
+    title: 'Giới thiệu',
+    description: 'Tin tức, chia sẻ kiến thức, bài viết.',
     iconName: 'Newspaper',
-    recommendedTag: 'Nội dung'
+    recommendedTag: ''
   },
   {
     id: 'landing-page',
-    title: 'Landing Page Sự Kiện / SP',
-    description: 'Trang đơn tập trung chuyển đổi, chạy quảng cáo Facebook/Google',
+    title: 'Landing Page',
+    description: 'Giới thiệu thương hiệu, quảng bá sản phẩm, thu hút khách hàng.',
     iconName: 'Rocket',
-    recommendedTag: 'Tối ưu ads'
-  },
-  {
-    id: 'portfolio',
-    title: 'Cá Nhân & Portfolio',
-    description: 'Trang cá nhân, CV trực tuyến, giới thiệu tác phẩm sáng tạo',
-    iconName: 'UserCheck',
-    recommendedTag: 'Cá nhân'
-  },
-  {
-    id: 'web-app',
-    title: 'Ứng Dụng Web / Hệ Thống',
-    description: 'SaaS, CRM, ERP, API backend, xử lý dữ liệu liên tục',
-    iconName: 'Server',
-    recommendedTag: 'Hiệu năng cao'
-  },
-  {
-    id: 'giao-duc',
-    title: 'Giáo Dục & Khóa Học',
-    description: 'E-learning, bán khóa học video, diễn đàn học viên',
-    iconName: 'GraduationCap',
-    recommendedTag: 'Đào tạo'
-  },
-  {
-    id: 'khac',
-    title: 'Nhu Cầu Khác',
-    description: 'Dự án đặc thù, diễn đàn cộng đồng hoặc công cụ riêng',
-    iconName: 'Sparkles',
-    recommendedTag: 'Tùy biến'
+    recommendedTag: ''
   }
 ];
 
@@ -217,29 +182,5 @@ export const FAQS = [
   }
 ];
 
-export const CUSTOMER_REVIEWS = [
-  {
-    name: 'Lê Hoàng Yến',
-    role: 'Chủ tiệm hoa tươi Yen Boutique',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    content: 'Trước đây web hay bị sập giờ cao điểm ngày lễ, đổi sang gói Business web chạy cực mượt, khách đặt hàng ầm ầm! Cực kỳ thích tính năng quét VietQR và xuất hóa đơn VAT điện tử ngay lập tức.',
-    rating: 5,
-    planUsed: 'Gói Business + Tên miền .vn'
-  },
-  {
-    name: 'Trần Minh Tuấn',
-    role: 'Giám đốc Xưởng gốm Bát Tràng Art',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    content: 'AI tư vấn chọn đúng tên miền .vn giúp bên mình tạo niềm tin cho đối tác xuất khẩu. Ổ cứng NVMe siêu nhanh, load hình ảnh sản phẩm gốm nét căng mà chưa đến 1 giây. Rất đáng đồng tiền bát gạo!',
-    rating: 5,
-    planUsed: 'Gói Shop Pro + Dedicated IP'
-  },
-  {
-    name: 'Nguyễn Phương Nam',
-    role: 'Blogger tại Cafe & Lifestyle Saigon',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
-    content: 'Giao diện đặt mua rất trực quan, chọn loại blog là AI gợi ý ngay gói Starter tiết kiệm. Áp mã VIBE2026 giảm thêm 15%, quét VietQR 3 giây là có ngay hosting để viết bài.',
-    rating: 5,
-    planUsed: 'Gói Starter + Daily Backup'
-  }
-];
+export const CUSTOMER_REVIEWS: any[] = [];
+

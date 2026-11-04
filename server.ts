@@ -442,6 +442,54 @@ app.get('/api/data', async (_req: Request, res: Response) => {
   }
 });
 
+// ================== API CUSTOMER REVIEWS ==================
+app.get('/api/reviews', async (_req: Request, res: Response) => {
+  try {
+    const db = await readDB();
+    res.json({ ok: true, reviews: db.customer_reviews || [] });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: 'Lỗi lấy đánh giá: ' + err.message });
+  }
+});
+
+app.post('/api/reviews', async (req: Request, res: Response) => {
+  try {
+    const { full_name, website_name, service_package, rating, review_content } = req.body || {};
+    if (!full_name || !review_content) {
+      return res.status(400).json({ ok: false, error: 'Vui lòng điền đủ Họ và tên và Nhận xét' });
+    }
+
+    const db = await readDB();
+    if (!db.customer_reviews) db.customer_reviews = [];
+
+    const newReview = {
+      id: req.body.id || `rev_${Date.now()}`,
+      full_name: String(full_name).trim(),
+      website_name: String(website_name || '').trim(),
+      service_package: String(service_package || 'Gói Business Hosting').trim(),
+      rating: Number(rating) || 5,
+      review_content: String(review_content).trim(),
+      created_at: req.body.created_at || new Date().toISOString()
+    };
+
+    db.customer_reviews.unshift(newReview);
+    await writeDB(db);
+
+    // Sync to Supabase table if available
+    try {
+      const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+      if (syncEnabled && anonKey) {
+        const client = createClient(url, anonKey, { auth: { persistSession: false } });
+        await client.from('reviews').insert([newReview]);
+      }
+    } catch {}
+
+    res.status(201).json({ ok: true, review: newReview });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: 'Lỗi gửi đánh giá: ' + err.message });
+  }
+});
+
 // ================== API AUTH & USERS ==================
 app.post('/api/auth/register', async (req: Request, res: Response) => {
   try {
@@ -609,7 +657,9 @@ app.post('/api/orders', optionalAuthenticateToken, async (req: AuthenticatedRequ
       aiDomainAdvice,
       customerName: bodyCustomerName,
       phone: bodyPhone,
-      email: bodyEmail
+      email: bodyEmail,
+      notes: bodyNotes,
+      isConsultation
     } = req.body;
 
     const db = await readDB();
@@ -701,19 +751,21 @@ app.post('/api/orders', optionalAuthenticateToken, async (req: AuthenticatedRequ
       subTotal,
       totalAmount,
       qrUrl,
-      paymentMethod: 'vietqr',
-      paymentStatus: 'unpaid',
-      status: 'pending_payment',
+      paymentMethod: isConsultation ? 'Tư Vấn Trực Tiếp' : 'vietqr',
+      paymentStatus: isConsultation ? 'consultation' : 'unpaid',
+      status: isConsultation ? 'consultation_requested' : 'pending_payment',
       assignedTo: null,
       assignedToName: 'Chưa phân công',
       serviceDetails: null,
       needs: needs || null,
       aiReason: aiReason || '',
       aiDomainAdvice: aiDomainAdvice || '',
-      notes: '',
+      notes: bodyNotes || '',
       timeline: [
         {
-          action: 'Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR',
+          action: isConsultation
+            ? `Khách hàng gửi yêu cầu tư vấn gói ${planInfo.name} (SĐT: ${phone}). ${bodyNotes ? 'Ghi chú: ' + bodyNotes : ''}`
+            : 'Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR',
           by: creatorUsername,
           time: new Date().toISOString()
         }
@@ -877,7 +929,7 @@ app.delete('/api/orders/:id', authenticateToken, authorizeRoles('admin'), async 
 
 // Helper for Smart Rule-Based Plan Recommendation Fallback
 function getRuleBasedRecommendation(plans: any[], needs: any) {
-  const { siteType, traffic, budget, needDomain, desiredDomain } = needs || {};
+  const { siteType, traffic, budget, needDomain, desiredDomain, brandName } = needs || {};
 
   // Scoring function
   let bestPlanId = 'basic';
@@ -888,20 +940,20 @@ function getRuleBasedRecommendation(plans: any[], needs: any) {
     bestPlanId = traffic === '50k-150k' || traffic === 'tren-150k' ? 'vps-1' : (traffic === '10k-50k' ? 'business' : 'shop-pro');
     budgetPlanId = 'basic';
     growthPlanId = bestPlanId === 'vps-1' ? 'vps-2' : 'shop-pro';
+  } else if (siteType === 'gioi-thieu' || siteType === 'tin-tuc' || siteType === 'giao-duc') {
+    bestPlanId = 'business';
+    budgetPlanId = 'basic';
+    growthPlanId = 'shop-pro';
+  } else if (siteType === 'landing-page' || siteType === 'portfolio' || siteType === 'ca-nhan') {
+    bestPlanId = 'basic';
+    budgetPlanId = 'starter';
+    growthPlanId = 'business';
   } else if (siteType === 'web-app' || siteType === 'he-thong') {
     bestPlanId = 'vps-1';
     budgetPlanId = 'business';
     growthPlanId = 'vps-2';
-  } else if (siteType === 'tin-tuc' || siteType === 'giao-duc') {
-    bestPlanId = 'business';
-    budgetPlanId = 'basic';
-    growthPlanId = 'shop-pro';
-  } else if (siteType === 'portfolio' || siteType === 'ca-nhan' || siteType === 'landing-page') {
-    bestPlanId = 'basic';
-    budgetPlanId = 'starter';
-    growthPlanId = 'business';
   } else {
-    // Default doanh nghiệp
+    // Default
     bestPlanId = 'basic';
     budgetPlanId = 'starter';
     growthPlanId = 'business';
@@ -923,9 +975,10 @@ function getRuleBasedRecommendation(plans: any[], needs: any) {
   const growthPlan = plans.find(p => p.id === growthPlanId && p.id !== bestPlanId && p.id !== budgetPlanId) || plans[3];
 
   let domainAdvice = '';
+  const domainOrBrand = desiredDomain || brandName;
   if (needDomain) {
-    if (desiredDomain) {
-      domainAdvice = `Với thương hiệu "${desiredDomain}", chúng tôi khuyên bạn nên đăng ký đuôi tên miền .vn hoặc .com.vn để khẳng định uy tín tại Việt Nam, kết hợp giữ thêm .com để bảo hộ thương hiệu toàn cầu.`;
+    if (domainOrBrand) {
+      domainAdvice = `Với thương hiệu "${domainOrBrand}", chúng tôi khuyên bạn nên đăng ký đuôi tên miền .vn hoặc .com.vn để khẳng định uy tín tại Việt Nam, kết hợp giữ thêm .com để bảo hộ thương hiệu toàn cầu.`;
     } else {
       domainAdvice = 'Bạn nên lựa chọn tên miền ngắn gọn, dễ nhớ, mang đậm dấu ấn thương hiệu và ưu tiên đuôi .vn hoặc .com.';
     }
