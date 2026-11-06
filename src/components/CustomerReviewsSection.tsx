@@ -22,6 +22,36 @@ export interface CustomerReview {
   isNew?: boolean;
 }
 
+export const DEFAULT_REVIEWS: CustomerReview[] = [
+  {
+    id: "REV-01",
+    full_name: "A",
+    website_name: "AKA",
+    service_package: "Gói Business Hosting",
+    rating: 5,
+    review_content: "Very Good",
+    created_at: "2026-11-03T10:00:00.000Z"
+  },
+  {
+    id: "REV-02",
+    full_name: "AAA",
+    website_name: "LALII",
+    service_package: "Gói Business Hosting",
+    rating: 5,
+    review_content: "Rất tốt",
+    created_at: "2026-11-03T10:30:00.000Z"
+  },
+  {
+    id: "REV-03",
+    full_name: "AAA",
+    website_name: "LALII",
+    service_package: "Gói Business Hosting",
+    rating: 5,
+    review_content: "Rất tốt",
+    created_at: "2026-11-03T11:00:00.000Z"
+  }
+];
+
 const STORAGE_KEY = 'hosting_customer_reviews_cache';
 const PAGE_SIZE = 4;
 
@@ -31,10 +61,10 @@ export const CustomerReviewsSection: React.FC = () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
-    return [];
+    return DEFAULT_REVIEWS;
   });
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,35 +79,53 @@ export const CustomerReviewsSection: React.FC = () => {
     message: string;
   } | null>(null);
 
-  // Real-time server sync function
+  // Real-time server and Supabase sync function
   const syncWithServer = async () => {
     try {
       let fetchedReviews: CustomerReview[] | null = null;
 
-      // 1. Try local Express API if available
+      // 1. Thử lấy từ Express server local nếu có
       try {
         const res = await fetch('/api/reviews');
         const contentType = res.headers.get('content-type') || '';
         if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
-          if (data && data.ok && Array.isArray(data.reviews)) {
+          if (data && data.ok && Array.isArray(data.reviews) && data.reviews.length > 0) {
             fetchedReviews = data.reviews;
           }
         }
       } catch {}
 
-      // 2. If running on Vercel static or offline, query Supabase directly
-      if (!fetchedReviews) {
-        try {
-          const { data: supaReviews, error } = await supabase
-            .from('reviews')
-            .select('*')
-            .order('created_at', { ascending: false });
+      // 2. Đồng bộ trực tiếp từ Supabase (bảo đảm mọi thiết bị và tài khoản đều xem được đánh giá)
+      try {
+        const { data: supaRows, error: sErr } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('plan_chosen', 'customer_review')
+          .order('created_at', { ascending: false });
 
-          if (!error && Array.isArray(supaReviews) && supaReviews.length > 0) {
-            fetchedReviews = supaReviews;
+        if (!sErr && Array.isArray(supaRows) && supaRows.length > 0) {
+          const supaReviews: CustomerReview[] = supaRows.map((r: any) => ({
+            id: r.id,
+            full_name: r.customer_name,
+            website_name: r.email || '',
+            service_package: r.plan_name,
+            rating: Number(r.total_amount) || 5,
+            review_content: r.domain_name,
+            created_at: r.created_at
+          }));
+
+          // Gộp đánh giá mới nhất với các đánh giá mẫu
+          const combined = [...supaReviews];
+          for (const def of DEFAULT_REVIEWS) {
+            if (!combined.some(c => c.id === def.id || (c.full_name === def.full_name && c.review_content === def.review_content))) {
+              combined.push(def);
+            }
           }
-        } catch {}
+          fetchedReviews = combined;
+        }
+      } catch (err) {
+        console.warn('Lỗi đọc đánh giá từ Supabase:', err);
       }
 
       if (fetchedReviews && fetchedReviews.length > 0) {
@@ -182,21 +230,36 @@ export const CustomerReviewsSection: React.FC = () => {
       body: JSON.stringify(newRev)
     }).catch(() => {});
 
-    // Đồng bộ trực tiếp tới Supabase (đảm bảo hiển thị và lưu trữ trên mọi môi trường như Vercel)
+    // Đồng bộ trực tiếp tới Supabase (bảo đảm mọi thiết bị và tài khoản đều nhận được đánh giá tức thì)
     (async () => {
       try {
-        await supabase.from('reviews').insert([
+        const { data, error } = await supabase.from('orders').insert([
           {
             id: newRev.id,
-            full_name: newRev.full_name,
-            website_name: newRev.website_name || '',
-            service_package: newRev.service_package,
-            rating: newRev.rating,
-            review_content: newRev.review_content,
-            created_at: newRev.created_at
+            customer_id: 'guest_review',
+            customer_name: newRev.full_name,
+            phone: String(newRev.rating),
+            email: newRev.website_name || '',
+            plan_chosen: 'customer_review',
+            plan_name: newRev.service_package,
+            total_amount: newRev.rating,
+            payment_status: 'approved',
+            status: 'customer_review',
+            billing_cycle_months: 12,
+            domain_name: newRev.review_content,
+            created_at: newRev.created_at,
+            updated_at: newRev.created_at
           }
-        ]);
-      } catch {}
+        ]).select();
+
+        if (error) {
+          console.warn('Lỗi ghi Supabase review:', error);
+        } else {
+          console.log('Đã lưu đánh giá thực tế thành công lên Supabase Cloud:', data);
+        }
+      } catch (err) {
+        console.warn('Supabase review insert error:', err);
+      }
     })();
   };
 

@@ -455,7 +455,38 @@ app.get('/api/data', async (_req: Request, res: Response) => {
 app.get('/api/reviews', async (_req: Request, res: Response) => {
   try {
     const db = await readDB();
-    res.json({ ok: true, reviews: db.customer_reviews || [] });
+    const reviews: any[] = [...(db.customer_reviews || [])];
+
+    // Đồng bộ thêm các đánh giá từ Supabase orders table
+    try {
+      const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+      if (syncEnabled && anonKey) {
+        const client = createClient(url, anonKey, { auth: { persistSession: false } });
+        const { data: supaRows } = await client
+          .from('orders')
+          .select('*')
+          .eq('plan_chosen', 'customer_review')
+          .order('created_at', { ascending: false });
+
+        if (Array.isArray(supaRows) && supaRows.length > 0) {
+          for (const row of supaRows) {
+            if (!reviews.some((r: any) => r.id === row.id)) {
+              reviews.unshift({
+                id: row.id,
+                full_name: row.customer_name,
+                website_name: row.email || '',
+                service_package: row.plan_name,
+                rating: Number(row.total_amount) || 5,
+                review_content: row.domain_name,
+                created_at: row.created_at
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+
+    res.json({ ok: true, reviews });
   } catch (err: any) {
     res.status(500).json({ ok: false, error: 'Lỗi lấy đánh giá: ' + err.message });
   }
@@ -484,12 +515,27 @@ app.post('/api/reviews', async (req: Request, res: Response) => {
     db.customer_reviews.unshift(newReview);
     await writeDB(db);
 
-    // Sync to Supabase table if available
+    // Sync to Supabase table
     try {
       const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
       if (syncEnabled && anonKey) {
         const client = createClient(url, anonKey, { auth: { persistSession: false } });
-        await client.from('reviews').insert([newReview]);
+        await client.from('orders').upsert({
+          id: newReview.id,
+          customer_id: 'guest_review',
+          customer_name: newReview.full_name,
+          phone: String(newReview.rating),
+          email: newReview.website_name || '',
+          plan_chosen: 'customer_review',
+          plan_name: newReview.service_package,
+          total_amount: newReview.rating,
+          payment_status: 'approved',
+          status: 'customer_review',
+          billing_cycle_months: 12,
+          domain_name: newReview.review_content,
+          created_at: newReview.created_at,
+          updated_at: newReview.created_at
+        });
       }
     } catch {}
 

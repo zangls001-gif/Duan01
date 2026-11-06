@@ -81,7 +81,7 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
         if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
           if (data && data.ok) {
-            fetched = data.orders || [];
+            fetched = (data.orders || []).filter((o: any) => o.planChosen !== 'customer_review');
           }
         }
       } catch {}
@@ -95,7 +95,9 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
             .order('created_at', { ascending: false });
 
           if (!sErr && Array.isArray(supaOrders) && supaOrders.length > 0) {
-            fetched = supaOrders.map((o) => ({
+            fetched = supaOrders
+              .filter((o) => o.plan_chosen !== 'customer_review')
+              .map((o) => ({
               id: o.id,
               customerId: o.customer_id || 'guest',
               customerName: o.customer_name || 'Khách hàng',

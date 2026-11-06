@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plan, Addon } from '../types';
 import { INITIAL_ADDONS } from '../data/constants';
 import { supabase } from '../data/supabaseClient';
+import { useAuth } from '../context/AuthContext';
 import {
   Check,
   ShoppingCart,
@@ -33,6 +34,7 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
   addons = INITIAL_ADDONS,
   onBuyPlan
 }) => {
+  const { user } = useAuth();
   const [filterType, setFilterType] = useState<string>('all');
   const [selectedPlanId, setSelectedPlanId] = useState<string>('basic');
   const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
@@ -168,11 +170,13 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
 
       // 2. Client-side & Supabase fallback for Vercel static deployments
       if (!orderCreated) {
+        const customerId = user?.id || 'guest_' + Date.now();
         orderCreated = {
           id: 'ORD-TV-' + Math.floor(100000 + Math.random() * 900000),
+          customerId: customerId,
           customerName: regFullName.trim(),
           phone: regPhone.trim(),
-          email: 'khachhang@example.com',
+          email: user?.email || 'khachhang@example.com',
           planChosen: registerModalPlan.id,
           planName: registerModalPlan.name,
           planPrice: registerModalPlan.pricePerMonth,
@@ -194,8 +198,9 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
 
         // Sync to Supabase directly so staff and admin receive consultation request
         try {
-          await supabase.from('orders').upsert({
+          const { data, error } = await supabase.from('orders').upsert({
             id: String(orderCreated.id),
+            customer_id: String(customerId),
             customer_name: orderCreated.customerName,
             phone: orderCreated.phone,
             email: orderCreated.email,
@@ -205,8 +210,16 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
             status: orderCreated.status,
             payment_status: orderCreated.paymentStatus,
             billing_cycle_months: orderCreated.billingCycleMonths,
-            created_at: orderCreated.createdAt
-          });
+            domain_name: `[TƯ VẤN] ${consultQuestion.trim() || 'Gói ' + registerModalPlan.name}`,
+            created_at: orderCreated.createdAt,
+            updated_at: new Date().toISOString()
+          }).select();
+
+          if (error) {
+            console.error('Lỗi lưu đăng ký tư vấn vào Supabase:', error);
+          } else {
+            console.log('Đã lưu đăng ký tư vấn thành công vào Supabase:', data);
+          }
         } catch (supErr) {
           console.warn('Supabase consultation sync notice:', supErr);
         }
