@@ -96,22 +96,21 @@ export const CustomerReviewsSection: React.FC = () => {
         }
       } catch {}
 
-      // 2. Đồng bộ trực tiếp từ Supabase (bảo đảm mọi thiết bị và tài khoản đều xem được đánh giá)
+      // 2. Đồng bộ trực tiếp từ Supabase bảng customer_reviews riêng biệt
       try {
         const { data: supaRows, error: sErr } = await supabase
-          .from('orders')
+          .from('customer_reviews')
           .select('*')
-          .eq('plan_chosen', 'customer_review')
           .order('created_at', { ascending: false });
 
         if (!sErr && Array.isArray(supaRows) && supaRows.length > 0) {
           const supaReviews: CustomerReview[] = supaRows.map((r: any) => ({
             id: r.id,
-            full_name: r.customer_name,
-            website_name: r.email || '',
-            service_package: r.plan_name,
-            rating: Number(r.total_amount) || 5,
-            review_content: r.domain_name,
+            full_name: r.full_name,
+            website_name: r.website_name || '',
+            service_package: r.service_package,
+            rating: Number(r.rating) || 5,
+            review_content: r.review_content,
             created_at: r.created_at
           }));
 
@@ -230,32 +229,25 @@ export const CustomerReviewsSection: React.FC = () => {
       body: JSON.stringify(newRev)
     }).catch(() => {});
 
-    // Đồng bộ trực tiếp tới Supabase (bảo đảm mọi thiết bị và tài khoản đều nhận được đánh giá tức thì)
+    // Đồng bộ trực tiếp tới Supabase bảng customer_reviews riêng biệt
     (async () => {
       try {
-        const { data, error } = await supabase.from('orders').insert([
+        const { data, error } = await supabase.from('customer_reviews').insert([
           {
             id: newRev.id,
-            customer_id: 'guest_review',
-            customer_name: newRev.full_name,
-            phone: String(newRev.rating),
-            email: newRev.website_name || '',
-            plan_chosen: 'customer_review',
-            plan_name: newRev.service_package,
-            total_amount: newRev.rating,
-            payment_status: 'approved',
-            status: 'customer_review',
-            billing_cycle_months: 12,
-            domain_name: newRev.review_content,
-            created_at: newRev.created_at,
-            updated_at: newRev.created_at
+            full_name: newRev.full_name,
+            website_name: newRev.website_name || '',
+            service_package: newRev.service_package,
+            rating: newRev.rating,
+            review_content: newRev.review_content,
+            created_at: newRev.created_at
           }
         ]).select();
 
         if (error) {
-          console.warn('Lỗi ghi Supabase review:', error);
+          console.warn('Lỗi ghi Supabase customer_reviews (nếu bảng chưa tạo, review vẫn hiển thị bình thường):', error.message);
         } else {
-          console.log('Đã lưu đánh giá thực tế thành công lên Supabase Cloud:', data);
+          console.log('Đã lưu đánh giá thực tế thành công lên bảng customer_reviews Supabase Cloud:', data);
         }
       } catch (err) {
         console.warn('Supabase review insert error:', err);

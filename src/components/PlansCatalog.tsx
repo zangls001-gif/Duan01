@@ -132,100 +132,90 @@ export const PlansCatalog: React.FC<PlansCatalogProps> = ({
     setIsSubmittingReg(true);
 
     try {
-      const payload = {
-        planChosen: registerModalPlan.id,
-        desiredDomain: '',
-        domainExtension: registerModalPlan.freeDomain ? '.com' : '',
-        billingCycleMonths: 12,
-        selectedAddons: selectedAddonIds,
-        couponCode: null,
-        needs: null,
+      const consultationPayload = {
+        customerId: user?.id || `guest_${Date.now()}`,
         customerName: regFullName.trim(),
         phone: regPhone.trim(),
-        email: 'khachhang@example.com',
-        isConsultation: true,
+        email: user?.email || '',
+        planChosen: registerModalPlan.id,
+        planName: registerModalPlan.name,
+        planPrice: registerModalPlan.pricePerMonth,
         notes: consultQuestion.trim()
-          ? `[YÊU CẦU TƯ VẤN] Gói ${registerModalPlan.name}: ${consultQuestion.trim()}`
-          : `[YÊU CẦU TƯ VẤN] Chuyên viên liên hệ tư vấn chi tiết về gói ${registerModalPlan.name}`
+          ? `[YÊU CẦU TƯ VẤN] ${consultQuestion.trim()}`
+          : `Yêu cầu chuyên viên tư vấn chi tiết về gói ${registerModalPlan.name}`
       };
 
-      let orderCreated: any = null;
+      let consultCreated: any = null;
 
-      // 1. Try server endpoint
+      // 1. Gửi tới API máy chủ /api/consultations riêng biệt
       try {
-        const res = await fetch('/api/orders', {
+        const res = await fetch('/api/consultations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(consultationPayload)
         });
 
         const contentType = res.headers.get('content-type') || '';
         if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
-          if (data && data.ok && data.order) {
-            orderCreated = data.order;
+          if (data && data.ok && data.consultation) {
+            consultCreated = data.consultation;
           }
         }
       } catch {}
 
-      // 2. Client-side & Supabase fallback for Vercel static deployments
-      if (!orderCreated) {
-        const customerId = user?.id || 'guest_' + Date.now();
-        orderCreated = {
-          id: 'ORD-TV-' + Math.floor(100000 + Math.random() * 900000),
-          customerId: customerId,
-          customerName: regFullName.trim(),
-          phone: regPhone.trim(),
-          email: user?.email || 'khachhang@example.com',
-          planChosen: registerModalPlan.id,
-          planName: registerModalPlan.name,
-          planPrice: registerModalPlan.pricePerMonth,
-          totalAmount: registerModalPlan.pricePerMonth * 12,
-          billingCycleMonths: 12,
-          isConsultation: true,
-          status: 'pending_payment',
-          paymentStatus: 'unpaid',
-          notes: payload.notes,
-          createdAt: new Date().toISOString()
+      // 2. Client-side fallback (cho Vercel và trực tiếp Supabase)
+      if (!consultCreated) {
+        consultCreated = {
+          id: 'TV-' + Math.floor(100000 + Math.random() * 900000),
+          customerId: consultationPayload.customerId,
+          customerName: consultationPayload.customerName,
+          phone: consultationPayload.phone,
+          email: consultationPayload.email,
+          planChosen: consultationPayload.planChosen,
+          planName: consultationPayload.planName,
+          planPrice: consultationPayload.planPrice,
+          notes: consultationPayload.notes,
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         };
-
-        // Cache into local orders
-        try {
-          const existing = JSON.parse(localStorage.getItem('ha_orders') || '[]');
-          existing.unshift(orderCreated);
-          localStorage.setItem('ha_orders', JSON.stringify(existing));
-        } catch {}
-
-        // Sync to Supabase directly so staff and admin receive consultation request
-        try {
-          const { data, error } = await supabase.from('orders').upsert({
-            id: String(orderCreated.id),
-            customer_id: String(customerId),
-            customer_name: orderCreated.customerName,
-            phone: orderCreated.phone,
-            email: orderCreated.email,
-            plan_chosen: orderCreated.planChosen,
-            plan_name: orderCreated.planName,
-            total_amount: orderCreated.totalAmount,
-            status: orderCreated.status,
-            payment_status: orderCreated.paymentStatus,
-            billing_cycle_months: orderCreated.billingCycleMonths,
-            domain_name: `[TƯ VẤN] ${consultQuestion.trim() || 'Gói ' + registerModalPlan.name}`,
-            created_at: orderCreated.createdAt,
-            updated_at: new Date().toISOString()
-          }).select();
-
-          if (error) {
-            console.error('Lỗi lưu đăng ký tư vấn vào Supabase:', error);
-          } else {
-            console.log('Đã lưu đăng ký tư vấn thành công vào Supabase:', data);
-          }
-        } catch (supErr) {
-          console.warn('Supabase consultation sync notice:', supErr);
-        }
       }
 
-      setCreatedRegOrder(orderCreated);
+      // Lưu vào cache riêng biệt ha_consultations (không nhét vào ha_orders)
+      try {
+        const existing = JSON.parse(localStorage.getItem('ha_consultations') || '[]');
+        existing.unshift(consultCreated);
+        localStorage.setItem('ha_consultations', JSON.stringify(existing));
+      } catch {}
+
+      // Đồng bộ trực tiếp vào bảng 'consultations' riêng biệt trên Supabase (tuyệt đối không chèn vào bảng 'orders')
+      try {
+        const { data, error } = await supabase.from('consultations').upsert({
+          id: String(consultCreated.id),
+          customer_id: String(consultCreated.customerId),
+          customer_name: consultCreated.customerName,
+          phone: consultCreated.phone,
+          email: consultCreated.email || '',
+          plan_chosen: consultCreated.planChosen,
+          plan_name: consultCreated.planName,
+          plan_price: consultCreated.planPrice || 0,
+          notes: consultCreated.notes || '',
+          status: consultCreated.status || 'pending',
+          created_at: consultCreated.createdAt,
+          updated_at: new Date().toISOString()
+        }).select();
+
+        if (error) {
+          console.warn('Ghi chú lưu bảng consultations trên Supabase:', error.message);
+        } else {
+          console.log('Đã lưu thành công yêu cầu tư vấn vào bảng consultations Supabase:', data);
+        }
+      } catch (supErr) {
+        console.warn('Supabase consultation sync notice:', supErr);
+      }
+
+      setCreatedRegOrder(consultCreated);
       setRegSuccess(true);
     } catch (err: any) {
       setRegError('Lỗi gửi yêu cầu tư vấn: ' + (err.message || 'Vui lòng thử lại'));

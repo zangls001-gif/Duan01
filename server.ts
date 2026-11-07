@@ -262,6 +262,51 @@ async function syncOrderToSupabase(order: any) {
   }
 }
 
+async function syncConsultationToSupabase(consultation: any) {
+  try {
+    const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+    if (!syncEnabled || !anonKey) {
+      return { ok: false, error: 'Chưa cấu hình Supabase API Key hoặc tắt đồng bộ' };
+    }
+
+    const client = createClient(url, anonKey, { auth: { persistSession: false } });
+
+    // Payload cho bảng consultations riêng biệt
+    const payload = {
+      id: String(consultation.id),
+      customer_id: String(consultation.customerId || 'guest'),
+      customer_name: String(consultation.customerName || 'Khách hàng'),
+      phone: String(consultation.phone || ''),
+      email: String(consultation.email || ''),
+      plan_chosen: String(consultation.planChosen || ''),
+      plan_name: String(consultation.planName || ''),
+      plan_price: Number(consultation.planPrice || 0),
+      notes: String(consultation.notes || ''),
+      status: String(consultation.status || 'pending'),
+      created_at: consultation.createdAt || new Date().toISOString(),
+      updated_at: consultation.updatedAt || new Date().toISOString()
+    };
+
+    console.log(`[Supabase Consultation Sync] Đang gửi yêu cầu tư vấn ${consultation.id} tới bảng consultations...`);
+
+    const { data, error } = await client
+      .from('consultations')
+      .upsert(payload, { onConflict: 'id' })
+      .select();
+
+    if (error) {
+      console.warn(`[Supabase Consultation Sync Chú ý]:`, error.message);
+      return { ok: false, error: error.message };
+    }
+
+    console.log(`[Supabase Consultation Sync Thành Công] Đã lưu tư vấn ${consultation.id} vào bảng 'consultations'!`, data);
+    return { ok: true, data };
+  } catch (err: any) {
+    console.warn(`[Supabase Consultation Sync Ngoại Lệ]:`, err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
 // Auth Middleware
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -457,15 +502,14 @@ app.get('/api/reviews', async (_req: Request, res: Response) => {
     const db = await readDB();
     const reviews: any[] = [...(db.customer_reviews || [])];
 
-    // Đồng bộ thêm các đánh giá từ Supabase orders table
+    // Đồng bộ thêm các đánh giá từ Supabase nếu có bảng customer_reviews
     try {
       const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
       if (syncEnabled && anonKey) {
         const client = createClient(url, anonKey, { auth: { persistSession: false } });
         const { data: supaRows } = await client
-          .from('orders')
+          .from('customer_reviews')
           .select('*')
-          .eq('plan_chosen', 'customer_review')
           .order('created_at', { ascending: false });
 
         if (Array.isArray(supaRows) && supaRows.length > 0) {
@@ -473,11 +517,11 @@ app.get('/api/reviews', async (_req: Request, res: Response) => {
             if (!reviews.some((r: any) => r.id === row.id)) {
               reviews.unshift({
                 id: row.id,
-                full_name: row.customer_name,
-                website_name: row.email || '',
-                service_package: row.plan_name,
-                rating: Number(row.total_amount) || 5,
-                review_content: row.domain_name,
+                full_name: row.full_name,
+                website_name: row.website_name || '',
+                service_package: row.service_package,
+                rating: Number(row.rating) || 5,
+                review_content: row.review_content,
                 created_at: row.created_at
               });
             }
@@ -515,26 +559,19 @@ app.post('/api/reviews', async (req: Request, res: Response) => {
     db.customer_reviews.unshift(newReview);
     await writeDB(db);
 
-    // Sync to Supabase table
+    // Sync to Supabase customer_reviews table (tách biệt hoàn toàn với orders)
     try {
       const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
       if (syncEnabled && anonKey) {
         const client = createClient(url, anonKey, { auth: { persistSession: false } });
-        await client.from('orders').upsert({
+        await client.from('customer_reviews').upsert({
           id: newReview.id,
-          customer_id: 'guest_review',
-          customer_name: newReview.full_name,
-          phone: String(newReview.rating),
-          email: newReview.website_name || '',
-          plan_chosen: 'customer_review',
-          plan_name: newReview.service_package,
-          total_amount: newReview.rating,
-          payment_status: 'approved',
-          status: 'customer_review',
-          billing_cycle_months: 12,
-          domain_name: newReview.review_content,
-          created_at: newReview.created_at,
-          updated_at: newReview.created_at
+          full_name: newReview.full_name,
+          website_name: newReview.website_name,
+          service_package: newReview.service_package,
+          rating: newReview.rating,
+          review_content: newReview.review_content,
+          created_at: newReview.created_at
         });
       }
     } catch {}
@@ -806,9 +843,9 @@ app.post('/api/orders', optionalAuthenticateToken, async (req: AuthenticatedRequ
       subTotal,
       totalAmount,
       qrUrl,
-      paymentMethod: isConsultation ? 'Tư Vấn Trực Tiếp' : 'vietqr',
-      paymentStatus: isConsultation ? 'consultation' : 'unpaid',
-      status: isConsultation ? 'consultation_requested' : 'pending_payment',
+      paymentMethod: 'vietqr',
+      paymentStatus: 'unpaid',
+      status: 'pending_payment',
       assignedTo: null,
       assignedToName: 'Chưa phân công',
       serviceDetails: null,
@@ -818,9 +855,7 @@ app.post('/api/orders', optionalAuthenticateToken, async (req: AuthenticatedRequ
       notes: bodyNotes || '',
       timeline: [
         {
-          action: isConsultation
-            ? `Khách hàng gửi yêu cầu tư vấn gói ${planInfo.name} (SĐT: ${phone}). ${bodyNotes ? 'Ghi chú: ' + bodyNotes : ''}`
-            : 'Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR',
+          action: 'Khách hàng tạo đơn mua hàng, chờ thanh toán VietQR',
           by: creatorUsername,
           time: new Date().toISOString()
         }
@@ -841,6 +876,167 @@ app.post('/api/orders', optionalAuthenticateToken, async (req: AuthenticatedRequ
     res.status(500).json({ ok: false, error: 'Lỗi máy chủ khi tạo đơn hàng: ' + err.message });
   }
 });
+
+// ================== API CONSULTATIONS (BẢNG DỮ LIỆU TƯ VẤN RIÊNG BIỆT) ==================
+app.get('/api/consultations', async (_req: Request, res: Response) => {
+  try {
+    const db = await readDB();
+    if (!db.consultations) db.consultations = [];
+    const list: any[] = [...db.consultations];
+
+    // Đồng bộ thêm các tư vấn từ Supabase bảng consultations riêng biệt
+    try {
+      const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+      if (syncEnabled && anonKey) {
+        const client = createClient(url, anonKey, { auth: { persistSession: false } });
+        const { data: supaRows } = await client
+          .from('consultations')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (Array.isArray(supaRows) && supaRows.length > 0) {
+          for (const row of supaRows) {
+            if (!list.some((c: any) => c.id === row.id)) {
+              list.push({
+                id: row.id,
+                customerId: row.customer_id,
+                customerName: row.customer_name,
+                phone: row.phone,
+                email: row.email || '',
+                planChosen: row.plan_chosen,
+                planName: row.plan_name,
+                planPrice: row.plan_price || 0,
+                notes: row.notes || '',
+                status: row.status || 'pending',
+                createdAt: row.created_at,
+                updatedAt: row.updated_at
+              });
+            }
+          }
+        }
+      }
+    } catch {}
+
+    res.json({ ok: true, consultations: list });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: 'Lỗi lấy danh sách tư vấn: ' + err.message });
+  }
+});
+
+app.post('/api/consultations', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      customerName,
+      phone,
+      email,
+      planChosen,
+      planName,
+      planPrice,
+      notes
+    } = req.body || {};
+
+    const cleanName = String(customerName || req.user?.fullName || '').trim();
+    const cleanPhone = String(phone || req.user?.phone || '').trim().replace(/[\s.-]/g, '');
+
+    if (!cleanName) {
+      return res.status(400).json({ ok: false, error: 'Họ và tên không được để trống' });
+    }
+
+    if (!/^0\d{9}$/.test(cleanPhone)) {
+      return res.status(400).json({ ok: false, error: 'Số điện thoại phải đúng định dạng 10 chữ số (bắt đầu bằng số 0)' });
+    }
+
+    const db = await readDB();
+    if (!db.consultations) db.consultations = [];
+
+    const consultationId = `TV-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newConsultation = {
+      id: consultationId,
+      customerId: req.user?.id || `guest_${Date.now()}`,
+      customerName: cleanName,
+      phone: cleanPhone,
+      email: String(email || req.user?.email || '').trim(),
+      planChosen: String(planChosen || 'basic'),
+      planName: String(planName || 'Gói Dịch Vụ'),
+      planPrice: Number(planPrice || 0),
+      notes: String(notes || '').trim(),
+      status: 'pending', // 'pending' (Chờ liên hệ), 'contacted' (Đang tư vấn), 'completed' (Đã xong)
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    db.consultations.unshift(newConsultation);
+    await writeDB(db);
+
+    // Đồng bộ lên bảng 'consultations' riêng biệt trong Supabase
+    const supabaseSync = await syncConsultationToSupabase(newConsultation);
+
+    res.status(201).json({ ok: true, consultation: newConsultation, supabaseSync });
+  } catch (err: any) {
+    console.error('Error creating consultation request:', err);
+    res.status(500).json({ ok: false, error: 'Lỗi máy chủ khi gửi đăng ký tư vấn: ' + err.message });
+  }
+});
+
+app.patch('/api/consultations/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    const db = await readDB();
+    if (!db.consultations) db.consultations = [];
+    const index = db.consultations.findIndex((c: any) => c.id === id);
+    if (index === -1) {
+      return res.status(404).json({ ok: false, error: 'Không tìm thấy yêu cầu tư vấn' });
+    }
+
+    if (status) db.consultations[index].status = status;
+    if (notes !== undefined) db.consultations[index].notes = notes;
+    db.consultations[index].updatedAt = new Date().toISOString();
+
+    await writeDB(db);
+
+    // Cập nhật lên Supabase consultations
+    try {
+      const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+      if (syncEnabled && anonKey) {
+        const client = createClient(url, anonKey, { auth: { persistSession: false } });
+        await client.from('consultations').update({
+          status: db.consultations[index].status,
+          notes: db.consultations[index].notes,
+          updated_at: db.consultations[index].updatedAt
+        }).eq('id', id);
+      }
+    } catch {}
+
+    res.json({ ok: true, consultation: db.consultations[index] });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: 'Lỗi cập nhật tư vấn: ' + err.message });
+  }
+});
+
+app.delete('/api/consultations/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const db = await readDB();
+    if (!db.consultations) db.consultations = [];
+    db.consultations = db.consultations.filter((c: any) => c.id !== id);
+    await writeDB(db);
+
+    // Xóa trên Supabase consultations
+    try {
+      const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+      if (syncEnabled && anonKey) {
+        const client = createClient(url, anonKey, { auth: { persistSession: false } });
+        await client.from('consultations').delete().eq('id', id);
+      }
+    } catch {}
+
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: 'Lỗi xóa tư vấn: ' + err.message });
+  }
+});
+
 
 // Khách ấn xác nhận đã chuyển khoản -> Cập nhật trạng thái và đồng bộ ngay lập tức tới Supabase
 app.post('/api/orders/:id/confirm-payment', optionalAuthenticateToken, async (req: AuthenticatedRequest, res: Response) => {

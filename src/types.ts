@@ -139,3 +139,19 @@ export interface SupabaseStatus {
   tables?: string[];
   lastTestedAt?: string;
 }
+
+export interface Consultation {
+  id: string;
+  customerId: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  planChosen: string;
+  planName: string;
+  planPrice?: number;
+  notes?: string;
+  status: 'pending' | 'contacted' | 'completed' | 'cancelled';
+  assignedTo?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}

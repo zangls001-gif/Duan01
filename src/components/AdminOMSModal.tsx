@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Order, User, SupabaseStatus } from '../types';
+import { Order, User, SupabaseStatus, Consultation } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../data/supabaseClient';
 import {
@@ -22,7 +22,10 @@ import {
   Link2,
   Key,
   ExternalLink,
-  Check
+  Check,
+  Headphones,
+  Phone,
+  Copy
 } from 'lucide-react';
 
 interface AdminOMSModalProps {
@@ -37,14 +40,22 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
   onViewInvoice
 }) => {
   const { user, token } = useAuth();
-  const [activeTab, setActiveTab] = useState<'orders' | 'supabase'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'consultations' | 'supabase'>('orders');
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // Filters for Orders
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Consultations State (Phần Tư Vấn Riêng Biệt)
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [isLoadingConsultations, setIsLoadingConsultations] = useState<boolean>(false);
+  const [consultSearchTerm, setConsultSearchTerm] = useState<string>('');
+  const [consultStatusFilter, setConsultStatusFilter] = useState<string>('all');
+  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
+  const [sqlCopied, setSqlCopied] = useState<boolean>(false);
 
   // Supabase State
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus | null>(null);
@@ -81,7 +92,12 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
         if (res.ok && contentType.includes('application/json')) {
           const data = await res.json();
           if (data && data.ok) {
-            fetched = (data.orders || []).filter((o: any) => o.planChosen !== 'customer_review');
+            fetched = (data.orders || []).filter(
+              (o: any) =>
+                o.planChosen !== 'customer_review' &&
+                o.status !== 'consultation_requested' &&
+                !String(o.id).startsWith('TV-')
+            );
           }
         }
       } catch {}
@@ -96,38 +112,43 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
 
           if (!sErr && Array.isArray(supaOrders) && supaOrders.length > 0) {
             fetched = supaOrders
-              .filter((o) => o.plan_chosen !== 'customer_review')
+              .filter(
+                (o) =>
+                  o.plan_chosen !== 'customer_review' &&
+                  o.status !== 'consultation_requested' &&
+                  !String(o.id).startsWith('TV-')
+              )
               .map((o) => ({
-              id: o.id,
-              customerId: o.customer_id || 'guest',
-              customerName: o.customer_name || 'Khách hàng',
-              phone: o.phone || '',
-              email: o.email || '',
-              planChosen: o.plan_chosen || '',
-              planName: o.plan_name || 'Gói dịch vụ',
-              planPrice: 0,
-              domainName: o.domain_name || '',
-              domainExtension: '',
-              domainPrice: 0,
-              isDomainFree: false,
-              billingCycleMonths: o.billing_cycle_months || 12,
-              addons: [],
-              couponApplied: null,
-              discountAmount: 0,
-              subTotal: o.total_amount || 0,
-              totalAmount: o.total_amount || 0,
-              qrUrl: '',
-              paymentMethod: 'vietqr',
-              paymentStatus: o.payment_status || 'paid_processing',
-              status: o.status || 'paid_processing',
-              assignedTo: null,
-              assignedToName: 'Chưa phân công',
-              serviceDetails: null,
-              notes: o.notes || null,
-              timeline: Array.isArray(o.timeline) ? o.timeline : [],
-              createdAt: o.created_at || new Date().toISOString(),
-              updatedAt: o.updated_at || new Date().toISOString()
-            }));
+                id: o.id,
+                customerId: o.customer_id || 'guest',
+                customerName: o.customer_name || 'Khách hàng',
+                phone: o.phone || '',
+                email: o.email || '',
+                planChosen: o.plan_chosen || '',
+                planName: o.plan_name || 'Gói dịch vụ',
+                planPrice: 0,
+                domainName: o.domain_name || '',
+                domainExtension: '',
+                domainPrice: 0,
+                isDomainFree: false,
+                billingCycleMonths: o.billing_cycle_months || 12,
+                addons: [],
+                couponApplied: null,
+                discountAmount: 0,
+                subTotal: o.total_amount || 0,
+                totalAmount: o.total_amount || 0,
+                qrUrl: '',
+                paymentMethod: 'vietqr',
+                paymentStatus: o.payment_status || 'paid_processing',
+                status: o.status || 'paid_processing',
+                assignedTo: null,
+                assignedToName: 'Chưa phân công',
+                serviceDetails: null,
+                notes: o.notes || null,
+                timeline: Array.isArray(o.timeline) ? o.timeline : [],
+                createdAt: o.created_at || new Date().toISOString(),
+                updatedAt: o.updated_at || new Date().toISOString()
+              }));
           }
         } catch {}
       }
@@ -136,7 +157,13 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
       if (!fetched) {
         try {
           const stored = localStorage.getItem('ha_orders');
-          fetched = stored ? JSON.parse(stored) : [];
+          const raw = stored ? JSON.parse(stored) : [];
+          fetched = raw.filter(
+            (o: any) =>
+              o.planChosen !== 'customer_review' &&
+              o.status !== 'consultation_requested' &&
+              !String(o.id).startsWith('TV-')
+          );
         } catch {
           fetched = [];
         }
@@ -144,10 +171,113 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
 
       setOrders(fetched || []);
     } catch (err: any) {
-      setError(err.message || 'Lỗi kết nối');
+      setError(err.message || 'Lỗi kết nối đơn hàng');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Lấy danh sách yêu cầu tư vấn (bảng riêng biệt consultations)
+  const fetchConsultations = async () => {
+    setIsLoadingConsultations(true);
+    try {
+      let fetched: Consultation[] | null = null;
+      try {
+        const res = await fetch('/api/consultations');
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data && data.ok && Array.isArray(data.consultations)) {
+            fetched = data.consultations;
+          }
+        }
+      } catch {}
+
+      // Fallback Supabase consultations table
+      if (!fetched) {
+        try {
+          const { data: supaConsults, error: sErr } = await supabase
+            .from('consultations')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!sErr && Array.isArray(supaConsults)) {
+            fetched = supaConsults.map((c: any) => ({
+              id: c.id,
+              customerId: c.customer_id || 'guest',
+              customerName: c.customer_name || 'Khách hàng',
+              phone: c.phone || '',
+              email: c.email || '',
+              planChosen: c.plan_chosen || '',
+              planName: c.plan_name || 'Gói Dịch Vụ',
+              planPrice: c.plan_price || 0,
+              notes: c.notes || '',
+              status: c.status || 'pending',
+              createdAt: c.created_at || new Date().toISOString(),
+              updatedAt: c.updated_at || new Date().toISOString()
+            }));
+          }
+        } catch {}
+      }
+
+      // Fallback localStorage ha_consultations
+      if (!fetched) {
+        try {
+          const stored = localStorage.getItem('ha_consultations');
+          fetched = stored ? JSON.parse(stored) : [];
+        } catch {
+          fetched = [];
+        }
+      }
+
+      setConsultations(fetched || []);
+    } catch (err: any) {
+      console.warn('Lỗi lấy danh sách tư vấn:', err);
+    } finally {
+      setIsLoadingConsultations(false);
+    }
+  };
+
+  const handleUpdateConsultationStatus = async (id: string, newStatus: string) => {
+    try {
+      // Optimistic update
+      setConsultations((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus as any, updatedAt: new Date().toISOString() } : c))
+      );
+
+      // Save to localStorage
+      try {
+        const current = JSON.parse(localStorage.getItem('ha_consultations') || '[]');
+        const updated = current.map((c: any) => (c.id === id ? { ...c, status: newStatus } : c));
+        localStorage.setItem('ha_consultations', JSON.stringify(updated));
+      } catch {}
+
+      // Call API
+      await fetch(`/api/consultations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      }).catch(() => {});
+
+      // Direct Supabase update
+      await supabase.from('consultations').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
+    } catch (err: any) {
+      console.warn('Lỗi đổi trạng thái tư vấn:', err);
+    }
+  };
+
+  const handleDeleteConsultation = async (id: string) => {
+    if (!confirm(`Xóa yêu cầu tư vấn ${id}? Thao tác này không thể hoàn tác.`)) return;
+
+    setConsultations((prev) => prev.filter((c) => c.id !== id));
+    try {
+      const current = JSON.parse(localStorage.getItem('ha_consultations') || '[]');
+      const updated = current.filter((c: any) => c.id !== id);
+      localStorage.setItem('ha_consultations', JSON.stringify(updated));
+    } catch {}
+
+    await fetch(`/api/consultations/${id}`, { method: 'DELETE' }).catch(() => {});
+    await supabase.from('consultations').delete().eq('id', id);
   };
 
   const fetchSupabaseStatus = async () => {
@@ -252,13 +382,14 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
   useEffect(() => {
     if (isOpen && token && (user?.role === 'admin' || user?.role === 'staff')) {
       fetchOrders();
+      fetchConsultations();
       fetchSupabaseStatus();
     }
   }, [isOpen, token, user]);
 
   if (!isOpen || (user?.role !== 'admin' && user?.role !== 'staff')) return null;
 
-  // KPIs
+  // KPIs for Orders
   const completedOrders = orders.filter((o) => o.status === 'completed');
   const revenueReceived = completedOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
@@ -266,6 +397,24 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
   const revenuePending = pendingOrders.reduce((sum, o) => sum + o.totalAmount, 0);
 
   const needsReviewCount = orders.filter((o) => o.status === 'paid_processing').length;
+
+  // KPIs for Consultations
+  const pendingConsultationsCount = consultations.filter((c) => c.status === 'pending').length;
+  const contactedConsultationsCount = consultations.filter((c) => c.status === 'contacted').length;
+  const completedConsultationsCount = consultations.filter((c) => c.status === 'completed').length;
+
+  // Filtered consultations
+  const filteredConsultations = consultations.filter((c) => {
+    const matchesSearch =
+      c.id.toLowerCase().includes(consultSearchTerm.toLowerCase()) ||
+      c.customerName.toLowerCase().includes(consultSearchTerm.toLowerCase()) ||
+      c.phone.includes(consultSearchTerm) ||
+      c.planName.toLowerCase().includes(consultSearchTerm.toLowerCase()) ||
+      (c.notes && c.notes.toLowerCase().includes(consultSearchTerm.toLowerCase()));
+
+    const matchesStatus = consultStatusFilter === 'all' || c.status === consultStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   // Filtered orders
   const filteredOrders = orders.filter((o) => {
@@ -464,9 +613,30 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
               }`}
             >
               <FileText className="w-4 h-4" />
-              <span>Quản Lý Đơn Hàng & Doanh Thu</span>
+              <span>Đơn Hàng Dịch Vụ</span>
               <span className="px-1.5 py-0.2 bg-slate-700 text-slate-300 rounded-full text-[10px]">
                 {orders.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('consultations')}
+              className={`py-3 px-3.5 border-b-2 flex items-center gap-2 transition-colors cursor-pointer ${
+                activeTab === 'consultations'
+                  ? 'border-purple-400 text-purple-300 bg-slate-800'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Headphones className="w-4 h-4 text-purple-400" />
+              <span>Yêu Cầu Tư Vấn Gói</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  pendingConsultationsCount > 0
+                    ? 'bg-amber-400 text-slate-950 animate-pulse'
+                    : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                {consultations.length}
               </span>
             </button>
 
@@ -767,6 +937,252 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
             </div>
           )}
         </>
+      ) : activeTab === 'consultations' ? (
+        /* Consultation Requests Panel (Phần Tư Vấn Riêng Biệt) */
+        <div className="space-y-6 animate-in fade-in">
+          {/* Header Banner */}
+          <div className="p-5 bg-gradient-to-r from-purple-900/90 to-indigo-900/90 text-white rounded-2xl border border-purple-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-1.5 bg-purple-500/30 rounded-lg">
+                  <Headphones className="w-5 h-5 text-purple-300" />
+                </span>
+                <h3 className="font-bold text-base sm:text-lg">Danh Sách Khách Hàng Đăng Ký Tư Vấn Gói</h3>
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-500/30 text-purple-200 border border-purple-400/30">
+                  Bảng Riêng Biệt • Supabase (`consultations`)
+                </span>
+              </div>
+              <p className="text-xs text-purple-200/90 max-w-2xl leading-relaxed">
+                Tách biệt hoàn toàn với Đơn Hàng Mua Dịch Vụ để không bị lẫn lộn dữ liệu. Nhân viên tư vấn có thể gọi điện trực tiếp qua số điện thoại 10 số của khách và cập nhật tiến độ tư vấn.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={fetchConsultations}
+                disabled={isLoadingConsultations}
+                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingConsultations ? 'animate-spin' : ''}`} />
+                <span>Làm Mới</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 4 Stats Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl">
+              <span className="text-xs font-bold text-purple-800 uppercase tracking-wider block mb-1">
+                Tổng Yêu Cầu
+              </span>
+              <span className="text-2xl font-black text-purple-700">{consultations.length}</span>
+            </div>
+
+            <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl">
+              <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block mb-1">
+                Chờ Liên Hệ
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-black text-amber-700">{pendingConsultationsCount}</span>
+                {pendingConsultationsCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
+                    Mới
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl">
+              <span className="text-xs font-bold text-blue-800 uppercase tracking-wider block mb-1">
+                Đang Tư Vấn
+              </span>
+              <span className="text-2xl font-black text-blue-700">{contactedConsultationsCount}</span>
+            </div>
+
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl">
+              <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block mb-1">
+                Đã Hoàn Tất
+              </span>
+              <span className="text-2xl font-black text-emerald-700">{completedConsultationsCount}</span>
+            </div>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={consultSearchTerm}
+                onChange={(e) => setConsultSearchTerm(e.target.value)}
+                placeholder="Tìm theo Tên khách, SĐT (10 số), gói..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-purple-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <select
+                value={consultStatusFilter}
+                onChange={(e) => setConsultStatusFilter(e.target.value)}
+                className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl focus:outline-hidden focus:border-purple-500 font-semibold cursor-pointer"
+              >
+                <option value="all">Tất Cả Trạng Thái</option>
+                <option value="pending">Chờ Liên Hệ</option>
+                <option value="contacted">Đang Tư Vấn</option>
+                <option value="completed">Đã Hoàn Tất</option>
+                <option value="cancelled">Đã Hủy</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Consultations List Table */}
+          <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Mã & Thời Gian</th>
+                    <th className="py-3 px-4">Khách Hàng (Tên & SĐT)</th>
+                    <th className="py-3 px-4">Gói Muốn Tư Vấn</th>
+                    <th className="py-3 px-4">Câu Hỏi / Ghi Chú Của Khách</th>
+                    <th className="py-3 px-4 text-center">Trạng Thái</th>
+                    <th className="py-3 px-4 text-center">Thao Tác Nhanh</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredConsultations.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                        {isLoadingConsultations ? 'Đang tải dữ liệu tư vấn...' : 'Chưa có yêu cầu tư vấn nào phù hợp bộ lọc.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredConsultations.map((c) => {
+                      const isPending = c.status === 'pending';
+                      const isContacted = c.status === 'contacted';
+                      const isDone = c.status === 'completed';
+
+                      return (
+                        <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3.5 px-4 font-mono">
+                            <span className="font-bold text-slate-900 block">{c.id}</span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(c.createdAt).toLocaleDateString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                day: '2-digit',
+                                month: '2-digit'
+                              })}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-slate-900 block">{c.customerName}</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs font-mono font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                {c.phone}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(c.phone);
+                                  setCopiedPhoneId(c.id);
+                                  setTimeout(() => setCopiedPhoneId(null), 2000);
+                                }}
+                                className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+                                title="Sao chép số điện thoại"
+                              >
+                                {copiedPhoneId === c.id ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                            {c.email && <span className="text-[10px] text-slate-400 block mt-0.5">{c.email}</span>}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <span className="font-bold text-slate-900 block">{c.planName}</span>
+                            {c.planPrice ? (
+                              <span className="text-[11px] text-indigo-600 block">
+                                {c.planPrice.toLocaleString('vi-VN')}đ / tháng
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="py-3.5 px-4 max-w-xs">
+                            <p className="text-xs text-slate-700 line-clamp-2" title={c.notes}>
+                              {c.notes || 'Khách mong muốn tư vấn thêm chi tiết cấu hình gói này.'}
+                            </p>
+                          </td>
+                          <td className="py-3.5 px-4 text-center">
+                            {isPending ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 inline-block">
+                                Chờ Liên Hệ
+                              </span>
+                            ) : isContacted ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-block">
+                                Đang Tư Vấn
+                              </span>
+                            ) : isDone ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-block">
+                                Đã Tư Vấn Xong
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 inline-block">
+                                Đã Hủy
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {/* Nút gọi điện thoại */}
+                              <a
+                                href={`tel:${c.phone}`}
+                                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                title="Bấm để gọi ngay"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>Gọi</span>
+                              </a>
+
+                              {/* Đổi trạng thái */}
+                              {isPending && (
+                                <button
+                                  onClick={() => handleUpdateConsultationStatus(c.id, 'contacted')}
+                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer"
+                                  title="Đánh dấu đang liên hệ"
+                                >
+                                  Đang Tư Vấn
+                                </button>
+                              )}
+
+                              {!isDone && (
+                                <button
+                                  onClick={() => handleUpdateConsultationStatus(c.id, 'completed')}
+                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer"
+                                  title="Đánh dấu hoàn thành tư vấn"
+                                >
+                                  Hoàn Tất
+                                </button>
+                              )}
+
+                              {user?.role === 'admin' && (
+                                <button
+                                  onClick={() => handleDeleteConsultation(c.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                  title="Xóa yêu cầu tư vấn"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       ) : (
             /* Supabase Cloud Connection Panel */
             <div className="space-y-6 animate-in fade-in">
@@ -1066,6 +1482,72 @@ export const AdminOMSModal: React.FC<AdminOMSModalProps> = ({
                   )}
                 </div>
               )}
+
+              {/* SQL Migration Script Helper for Consultations table */}
+              <div className="bg-gradient-to-br from-slate-900 to-indigo-950 text-slate-200 rounded-2xl p-6 border border-indigo-500/40 space-y-4 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                      <Database className="w-4 h-4 text-purple-400" />
+                      <span>Câu Lệnh SQL Tạo Bảng Riêng Cho Tư Vấn (`consultations`):</span>
+                    </h4>
+                    <p className="text-xs text-indigo-200 mt-1">
+                      Chạy câu lệnh này trong <strong>Supabase SQL Editor</strong> để tách hoàn toàn đơn tư vấn ra bảng riêng:
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sql = `-- Tạo bảng riêng cho Tư Vấn Dịch Vụ (consultations)
+CREATE TABLE IF NOT EXISTS public.consultations (
+  id text PRIMARY KEY,
+  customer_id text DEFAULT 'guest',
+  customer_name text NOT NULL,
+  phone text NOT NULL,
+  email text,
+  plan_chosen text NOT NULL,
+  plan_name text NOT NULL,
+  plan_price numeric DEFAULT 0,
+  notes text,
+  status text DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Mở quyền truy cập cho anon / public
+ALTER TABLE public.consultations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on consultations" ON public.consultations FOR ALL USING (true) WITH CHECK (true);`;
+                      navigator.clipboard.writeText(sql);
+                      setSqlCopied(true);
+                      setTimeout(() => setSqlCopied(false), 2500);
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 shadow-xs"
+                  >
+                    {sqlCopied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                    <span>{sqlCopied ? 'Đã Sao Chép SQL!' : 'Sao Chép Mã SQL'}</span>
+                  </button>
+                </div>
+
+                <pre className="p-3 bg-slate-950/90 border border-indigo-800/50 rounded-xl text-[11px] font-mono text-purple-200 overflow-x-auto leading-relaxed">
+{`CREATE TABLE IF NOT EXISTS public.consultations (
+  id text PRIMARY KEY,
+  customer_id text DEFAULT 'guest',
+  customer_name text NOT NULL,
+  phone text NOT NULL,
+  email text,
+  plan_chosen text NOT NULL,
+  plan_name text NOT NULL,
+  plan_price numeric DEFAULT 0,
+  notes text,
+  status text DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.consultations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on consultations" ON public.consultations FOR ALL USING (true) WITH CHECK (true);`}
+                </pre>
+              </div>
 
               {/* Developer Integration Code Box */}
               <div className="bg-slate-950 text-slate-300 rounded-2xl p-6 border border-slate-800 space-y-3 font-mono text-xs">
