@@ -1,3 +1,6 @@
-import app from '../server';
+import type { IncomingMessage, ServerResponse } from 'http';
+import app from '../server.ts';
 
-export default app;
+export default function handler(req: IncomingMessage, res: ServerResponse) {
+  return (app as any)(req, res);
+}

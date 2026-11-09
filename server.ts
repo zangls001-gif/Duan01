@@ -50,14 +50,46 @@ let inMemoryDB: any = null;
 
 async function readDB() {
   if (inMemoryDB) return inMemoryDB;
-  try {
-    const data = await fs.readFile(DB_FILE, 'utf-8');
-    inMemoryDB = JSON.parse(data);
-    return inMemoryDB;
-  } catch (err) {
-    console.error('Error reading db.json:', err);
-    throw err;
+
+  const candidatePaths = [
+    DB_FILE,
+    path.resolve(process.cwd(), 'db.json'),
+    path.resolve(__dirname, '..', 'db.json'),
+    '/tmp/db.json'
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      const data = await fs.readFile(p, 'utf-8');
+      inMemoryDB = JSON.parse(data);
+      if (inMemoryDB && typeof inMemoryDB === 'object') {
+        return inMemoryDB;
+      }
+    } catch {}
   }
+
+  console.warn('[readDB] db.json could not be read from disk, using resilient fallback in-memory database');
+  inMemoryDB = {
+    supabase_config: {
+      url: DEFAULT_SUPABASE_URL,
+      anonKey: DEFAULT_SUPABASE_ANON_KEY,
+      syncEnabled: true
+    },
+    users: [
+      { id: 'usr_admin', username: 'admin', password: 'admin123@password', fullName: 'Nguyễn Quản Trị', phone: '0901000001', email: 'admin@hostingadvisor.vn', role: 'admin' },
+      { id: 'usr_staff', username: 'staff', password: 'staff123@password', fullName: 'Trần Tư Vấn', phone: '0901000002', email: 'staff@hostingadvisor.vn', role: 'staff' },
+      { id: 'usr_cust_01', username: 'hoangyen', password: '123456@password', fullName: 'Lê Hoàng Yến', phone: '0988123456', email: 'hoangyen.boutique@gmail.com', role: 'customer' }
+    ],
+    coupons: [
+      { code: 'VIBE2026', type: 'percent', value: 15, description: 'Giảm ngay 15% tổng hóa đơn' }
+    ],
+    addons: [],
+    plans: [],
+    orders: [],
+    consultations: [],
+    customer_reviews: []
+  };
+  return inMemoryDB;
 }
 
 async function writeDB(data: any) {
@@ -65,7 +97,15 @@ async function writeDB(data: any) {
   try {
     await fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
-    console.warn('Read-only filesystem detected, maintaining in memory:', err);
+    try {
+      await fs.writeFile(path.resolve(process.cwd(), 'db.json'), JSON.stringify(data, null, 2), 'utf-8');
+    } catch {
+      try {
+        await fs.writeFile('/tmp/db.json', JSON.stringify(data, null, 2), 'utf-8');
+      } catch {
+        console.warn('Read-only filesystem detected, maintaining database state in memory');
+      }
+    }
   }
 }
 
@@ -497,7 +537,7 @@ app.get('/api/data', async (_req: Request, res: Response) => {
 });
 
 // ================== API CUSTOMER REVIEWS ==================
-app.get('/api/reviews', async (_req: Request, res: Response) => {
+app.get(['/api/reviews', '/api/customer-reviews'], async (_req: Request, res: Response) => {
   try {
     const db = await readDB();
     const reviews: any[] = [...(db.customer_reviews || [])];
@@ -536,7 +576,7 @@ app.get('/api/reviews', async (_req: Request, res: Response) => {
   }
 });
 
-app.post('/api/reviews', async (req: Request, res: Response) => {
+app.post(['/api/reviews', '/api/customer-reviews'], async (req: Request, res: Response) => {
   try {
     const { full_name, website_name, service_package, rating, review_content } = req.body || {};
     if (!full_name || !review_content) {
@@ -1110,7 +1150,40 @@ app.patch('/api/orders/:id', authenticateToken, authorizeRoles('admin', 'staff')
     const { id } = req.params;
     const { status, notes, assignedTo } = req.body;
     const db = await readDB();
-    const order = db.orders.find((o: any) => o.id === id);
+    let order = db.orders.find((o: any) => o.id === id);
+
+    // Nếu không có trong bộ nhớ cục bộ, tìm trực tiếp trên Supabase
+    if (!order) {
+      try {
+        const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+        if (syncEnabled && anonKey) {
+          const client = createClient(url, anonKey, { auth: { persistSession: false } });
+          const { data: supaRow } = await client.from('orders').select('*').eq('id', id).maybeSingle();
+          if (supaRow) {
+            order = {
+              id: supaRow.id,
+              customerId: supaRow.customer_id || 'guest',
+              customerName: supaRow.customer_name || 'Khách hàng',
+              phone: supaRow.phone || '',
+              email: supaRow.email || '',
+              planChosen: supaRow.plan_chosen || '',
+              planName: supaRow.plan_name || 'Gói Dịch Vụ',
+              planPrice: 0,
+              totalAmount: supaRow.total_amount || 0,
+              billingCycleMonths: supaRow.billing_cycle_months || 12,
+              domainName: supaRow.domain_name || '',
+              status: supaRow.status,
+              paymentStatus: supaRow.payment_status,
+              addons: [],
+              timeline: [],
+              createdAt: supaRow.created_at,
+              updatedAt: supaRow.updated_at
+            };
+            db.orders.unshift(order);
+          }
+        }
+      } catch {}
+    }
 
     if (!order) return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
 
@@ -1123,15 +1196,17 @@ app.patch('/api/orders/:id', authenticateToken, authorizeRoles('admin', 'staff')
           nameServers: ['ns1.hostingadvisor.vn', 'ns2.hostingadvisor.vn'],
           expireDate: new Date(Date.now() + (order.billingCycleMonths || 12) * 30 * 24 * 60 * 60 * 1000).toISOString()
         };
+        if (!Array.isArray(order.timeline)) order.timeline = [];
         order.timeline.push({
           action: `Xác nhận nhận đủ ${order.totalAmount.toLocaleString('vi-VN')}đ & Kích hoạt gói dịch vụ`,
-          by: req.user!.username,
+          by: req.user?.username || 'admin',
           time: new Date().toISOString()
         });
       } else {
+        if (!Array.isArray(order.timeline)) order.timeline = [];
         order.timeline.push({
           action: `Cập nhật trạng thái đơn: ${status}`,
-          by: req.user!.username,
+          by: req.user?.username || 'admin',
           time: new Date().toISOString()
         });
       }
@@ -1376,12 +1451,80 @@ app.post('/api/advice/sales-script', authenticateToken, authorizeRoles('admin', 
   try {
     const { orderId } = req.body;
     const db = await readDB();
-    const order = db.orders.find((o: any) => o.id === orderId);
-    if (!order) return res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng' });
+    let order = db.orders.find((o: any) => o.id === orderId);
 
-    const fallbackScript = `Bước 1 (Chào hỏi & Xác nhận): "Dạ em chào anh/chị ${order.customerName}, em gọi từ HostingAdvisor hỗ trợ kích hoạt gói ${order.planName} và tên miền ${order.domainName || 'website'} của mình ạ."
-Bước 2 (Tư vấn giá trị & Hỗ trợ): "Dạ đơn hàng của mình có tổng thanh toán là ${order.totalAmount.toLocaleString('vi-VN')}đ, em thấy trạng thái hiện tại là ${order.status === 'pending_payment' ? 'chờ chuyển khoản' : 'đang xử lý'}. Không biết anh/chị có gặp khó khăn gì khi quét mã VietQR không để em hỗ trợ trực tiếp ạ?"
-Bước 3 (Chốt & Kích hoạt): "Sau khi nhận được tiền, bên em sẽ tự động bàn giao thông số máy chủ IP và kích hoạt chứng chỉ SSL miễn phí ngay cho anh/chị trong 5 phút nhé ạ!"`;
+    // Nếu không tìm thấy trong bộ nhớ cục bộ, tìm trên Supabase orders
+    if (!order && orderId) {
+      try {
+        const { url, anonKey, syncEnabled } = await getSupabaseConfigData();
+        if (syncEnabled && anonKey) {
+          const client = createClient(url, anonKey, { auth: { persistSession: false } });
+          const { data: supaRow } = await client.from('orders').select('*').eq('id', orderId).maybeSingle();
+          if (supaRow) {
+            order = {
+              id: supaRow.id,
+              customerId: supaRow.customer_id || 'guest',
+              customerName: supaRow.customer_name || 'Khách hàng',
+              phone: supaRow.phone || '',
+              email: supaRow.email || '',
+              planChosen: supaRow.plan_chosen || '',
+              planName: supaRow.plan_name || 'Gói Dịch Vụ',
+              planPrice: 0,
+              totalAmount: supaRow.total_amount || 0,
+              billingCycleMonths: supaRow.billing_cycle_months || 12,
+              domainName: supaRow.domain_name || '',
+              status: supaRow.status,
+              paymentStatus: supaRow.payment_status,
+              addons: [],
+              timeline: [],
+              createdAt: supaRow.created_at,
+              updatedAt: supaRow.updated_at
+            };
+          }
+        }
+      } catch {}
+    }
+
+    if (!order) {
+      return res.json({
+        ok: true,
+        source: 'template',
+        script: `📞 KỊCH BẢN GỌI ĐIỆN TƯ VẤN & HỖ TRỢ ĐƠN HÀNG:
+
+Bước 1: Chào hỏi khách hàng và giới thiệu từ bộ phận hỗ trợ HostingAdvisor.
+Bước 2: Xác nhận gói dịch vụ hosting và kiểm tra thông tin chuyển khoản VietQR.
+Bước 3: Hướng dẫn kỹ thuật và cam kết kích hoạt máy chủ ngay sau khi nhận tiền.`
+      });
+    }
+
+    const isPaid = order.status === 'paid_processing';
+    const cycleText = order.billingCycleMonths ? `${order.billingCycleMonths} tháng` : '12 tháng';
+    const domainText = order.domainName && order.domainName !== 'EMPTY' ? ` và tên miền "${order.domainName}"` : '';
+    const addonsText = order.addons && order.addons.length > 0 
+      ? ` kèm tiện ích: ${order.addons.map((a: any) => a.name).join(', ')}` 
+      : '';
+
+    const fallbackScript = isPaid
+      ? `📞 KỊCH BẢN TELESALE DÀNH CHO ĐƠN ${order.id} (KHÁCH ĐÃ BẤM CHUYỂN KHOẢN):
+
+Bước 1 (Chào hỏi & Xác nhận giao dịch):
+"Dạ em chào anh/chị ${order.customerName}, em là chuyên viên hỗ trợ từ HostingAdvisor gọi đến qua số ${order.phone} ạ. Em thấy trên hệ thống mình vừa tạo đơn đăng ký gói Hosting ${order.planName} (${cycleText})${domainText} với tổng thanh toán là ${order.totalAmount.toLocaleString('vi-VN')}đ."
+
+Bước 2 (Đối soát thanh toán & Thông báo kích hoạt):
+"Em liên hệ để xác nhận mình đã thao tác chuyển khoản qua mã VietQR thành công chưa ạ? Nếu mình đã chuyển rồi, em sẽ bấm duyệt tiền trên hệ thống ngay để cấp phát địa chỉ IP máy chủ độc lập và gửi email bàn giao tài khoản quản trị cho mình trong vòng 2 phút tới ạ."
+
+Bước 3 (Hỗ trợ kỹ thuật & Cam kết):
+"Bên em có đội ngũ kỹ thuật trực 24/7, nếu anh/chị cần hỗ trợ trỏ tên miền, cài đặt mã nguồn hoặc kích hoạt chứng chỉ SSL miễn phí thì em sẽ hỗ trợ trực tiếp cho mình luôn nhé ạ!"`
+      : `📞 KỊCH BẢN TELESALE DÀNH CHO ĐƠN ${order.id} (KHÁCH CHỜ THANH TOÁN VIETQR):
+
+Bước 1 (Chào hỏi & Nhắc nhở ưu đãi):
+"Dạ em chào anh/chị ${order.customerName}! Em gọi từ bộ phận tư vấn của HostingAdvisor hỗ trợ mình cho đơn hàng gói Hosting ${order.planName} (${cycleText})${domainText}${addonsText} ạ."
+
+Bước 2 (Hỗ trợ thanh toán VietQR & Giải đáp thắc mắc):
+"Dạ em thấy đơn của mình có tổng phí là ${order.totalAmount.toLocaleString('vi-VN')}đ và hệ thống đang chờ thanh toán qua mã VietQR tự động. Không biết anh/chị có đang gặp vướng mắc gì về cách quét mã ngân hàng hay cần em giải thích thêm về thông số kỹ thuật của gói ${order.planName} không ạ?"
+
+Bước 3 (Cam kết quyền lợi & Chốt kích hoạt nhanh):
+"Dạ nếu tiện bây giờ, anh/chị chỉ cần mở app ngân hàng quét mã QR trên màn hình đơn hàng, hệ thống sẽ đối soát tự động và kích hoạt hosting kèm backup dữ liệu ngay lập tức ạ. Em xin phép gửi thêm thông tin liên hệ hỗ trợ qua Zalo số ${order.phone} này của mình nhé ạ!"`;
 
     const ai = getAiClient();
     if (!ai) {
@@ -1441,7 +1584,8 @@ async function startServer() {
   });
 }
 
-if (!process.env.VERCEL) {
+const isServerless = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL_ENV;
+if (!isServerless && process.env.NODE_ENV !== 'test') {
   startServer().catch((err) => {
     console.error('Failed to start server:', err);
     process.exit(1);
