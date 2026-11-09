@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Order, User, SupabaseStatus, Consultation } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../data/supabaseClient';
@@ -27,6 +27,69 @@ import {
   Phone,
   Copy
 } from 'lucide-react';
+
+interface CustomTooltipProps {
+  content: string;
+  children: React.ReactNode;
+  position?: 'top' | 'bottom';
+  delayMs?: number;
+}
+
+// Tooltip có độ trễ (delay) nhẹ - loại bỏ 100% hiện tượng chớp vạch đen của trình duyệt
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ 
+  content, 
+  children, 
+  position = 'top',
+  delayMs = 300 
+}) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    // Dừng một lúc trước khi hiển thị - không bị chớp hay hiện khối đen
+    timerRef.current = setTimeout(() => {
+      setIsVisible(true);
+    }, delayMs);
+  };
+
+  const handleMouseLeave = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsVisible(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return (
+    <div 
+      className="relative inline-flex items-center"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {children}
+      {isVisible && (
+        <div 
+          className={`absolute ${
+            position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+          } left-1/2 -translate-x-1/2 px-2.5 py-1 bg-slate-900/95 text-white text-[11px] font-medium rounded-lg shadow-xl whitespace-nowrap z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150 border border-slate-700/60 flex items-center justify-center`}
+        >
+          {content}
+          <span 
+            className={`absolute left-1/2 -translate-x-1/2 border-4 border-transparent ${
+              position === 'top' ? 'top-full border-t-slate-900/95' : 'bottom-full border-b-slate-900/95'
+            }`} 
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface AdminOMSModalProps {
   isOpen: boolean;
@@ -728,17 +791,18 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                 <span>Xuất CSV</span>
               </button>
             )}
-            <button
-              onClick={() => {
-                fetchOrders();
-                fetchSupabaseStatus();
-              }}
-              disabled={isLoading || isCheckingSupabase}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Làm mới dữ liệu"
-            >
-              <RefreshCw className={`w-4 h-4 ${isLoading || isCheckingSupabase ? 'animate-spin' : ''}`} />
-            </button>
+            <CustomTooltip content="Làm mới dữ liệu" position="bottom">
+              <button
+                onClick={() => {
+                  fetchOrders();
+                  fetchSupabaseStatus();
+                }}
+                disabled={isLoading || isCheckingSupabase}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading || isCheckingSupabase ? 'animate-spin' : ''}`} />
+              </button>
+            </CustomTooltip>
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
@@ -1004,44 +1068,48 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               {/* Confirm Payment button */}
                               {!isCompleted && (
-                                <button
-                                  onClick={() => handleApprovePayment(order.id)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                                  title="Xác nhận nhận tiền & Cấp IP hosting tự động"
-                                >
-                                  <CheckCircle2 className="w-3 h-3" />
-                                  <span>Duyệt Tiền</span>
-                                </button>
+                                <CustomTooltip content="Xác nhận nhận tiền & Cấp IP hosting tự động">
+                                  <button
+                                    onClick={() => handleApprovePayment(order.id)}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>Duyệt Tiền</span>
+                                  </button>
+                                </CustomTooltip>
                               )}
 
                               {/* AI Telesale Script button */}
-                              <button
-                                onClick={() => handleGenerateTelesale(order.id)}
-                                className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 border border-indigo-200"
-                                title="AI soạn kịch bản gọi điện chốt đơn 3 bước"
-                              >
-                                <Sparkles className="w-3 h-3 text-indigo-600" />
-                                <span>AI Telesale</span>
-                              </button>
+                              <CustomTooltip content="AI soạn kịch bản gọi điện chốt đơn 3 bước">
+                                <button
+                                  onClick={() => handleGenerateTelesale(order.id)}
+                                  className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 border border-indigo-200"
+                                >
+                                  <Sparkles className="w-3 h-3 text-indigo-600" />
+                                  <span>AI Telesale</span>
+                                </button>
+                              </CustomTooltip>
 
                               {/* Invoice */}
-                              <button
-                                onClick={() => onViewInvoice(order)}
-                                className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md cursor-pointer"
-                                title="Xem hóa đơn"
-                              >
-                                <FileText className="w-3.5 h-3.5" />
-                              </button>
+                              <CustomTooltip content="Xem chi tiết hóa đơn">
+                                <button
+                                  onClick={() => onViewInvoice(order)}
+                                  className="p-1 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md cursor-pointer"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                </button>
+                              </CustomTooltip>
 
                               {/* Delete (Admin only) */}
                               {user?.role === 'admin' && (
-                                <button
-                                  onClick={() => handleDeleteOrder(order.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
-                                  title="Xóa đơn hàng"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <CustomTooltip content="Xóa đơn hàng">
+                                  <button
+                                    onClick={() => handleDeleteOrder(order.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </CustomTooltip>
                               )}
                             </div>
                           </td>
@@ -1092,14 +1160,15 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                   {activeTelesaleOrder && (
                     <div className="flex items-center gap-2 shrink-0">
                       {activeTelesaleOrder.phone && (
-                        <a
-                          href={`tel:${activeTelesaleOrder.phone}`}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
-                          title="Bấm để gọi điện thoại ngay"
-                        >
-                          <Phone className="w-3.5 h-3.5" />
-                          <span>Gọi Điện</span>
-                        </a>
+                        <CustomTooltip content="Bấm để gọi điện thoại ngay">
+                          <a
+                            href={`tel:${activeTelesaleOrder.phone}`}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+                          >
+                            <Phone className="w-3.5 h-3.5" />
+                            <span>Gọi Điện</span>
+                          </a>
+                        </CustomTooltip>
                       )}
                       <button
                         onClick={() => {
@@ -1282,7 +1351,6 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                                   setTimeout(() => setCopiedPhoneId(null), 2000);
                                 }}
                                 className="text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
-                                title="Sao chép số điện thoại"
                               >
                                 {copiedPhoneId === c.id ? (
                                   <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -1302,7 +1370,7 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                             ) : null}
                           </td>
                           <td className="py-3.5 px-4 max-w-xs">
-                            <p className="text-xs text-slate-700 line-clamp-2" title={c.notes}>
+                            <p className="text-xs text-slate-700 line-clamp-2">
                               {c.notes || 'Khách mong muốn tư vấn thêm chi tiết cấu hình gói này.'}
                             </p>
                           </td>
@@ -1328,44 +1396,48 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                           <td className="py-3.5 px-4">
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               {/* Nút gọi điện thoại */}
-                              <a
-                                href={`tel:${c.phone}`}
-                                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
-                                title="Bấm để gọi ngay"
-                              >
-                                <Phone className="w-3 h-3" />
-                                <span>Gọi</span>
-                              </a>
+                              <CustomTooltip content="Bấm để gọi tư vấn ngay">
+                                <a
+                                  href={`tel:${c.phone}`}
+                                  className="px-2.5 py-1 bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                                >
+                                  <Phone className="w-3 h-3" />
+                                  <span>Gọi</span>
+                                </a>
+                              </CustomTooltip>
 
                               {/* Đổi trạng thái */}
                               {isPending && (
-                                <button
-                                  onClick={() => handleUpdateConsultationStatus(c.id, 'contacted')}
-                                  className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer"
-                                  title="Đánh dấu đang liên hệ"
-                                >
-                                  Đang Tư Vấn
-                                </button>
+                                <CustomTooltip content="Đánh dấu đang liên hệ">
+                                  <button
+                                    onClick={() => handleUpdateConsultationStatus(c.id, 'contacted')}
+                                    className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer shadow-xs"
+                                  >
+                                    Đang Tư Vấn
+                                  </button>
+                                </CustomTooltip>
                               )}
 
                               {!isDone && (
-                                <button
-                                  onClick={() => handleUpdateConsultationStatus(c.id, 'completed')}
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer"
-                                  title="Đánh dấu hoàn thành tư vấn"
-                                >
-                                  Hoàn Tất
-                                </button>
+                                <CustomTooltip content="Đánh dấu hoàn thành tư vấn">
+                                  <button
+                                    onClick={() => handleUpdateConsultationStatus(c.id, 'completed')}
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] rounded-lg transition-colors cursor-pointer shadow-xs"
+                                  >
+                                    Hoàn Tất
+                                  </button>
+                                </CustomTooltip>
                               )}
 
                               {user?.role === 'admin' && (
-                                <button
-                                  onClick={() => handleDeleteConsultation(c.id)}
-                                  className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                                  title="Xóa yêu cầu tư vấn"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <CustomTooltip content="Xóa yêu cầu tư vấn">
+                                  <button
+                                    onClick={() => handleDeleteConsultation(c.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </CustomTooltip>
                               )}
                             </div>
                           </td>
@@ -1603,7 +1675,6 @@ BƯỚC 3: BÀN GIAO TÀI KHOẢN & HỖ TRỢ 24/7
                             type="button"
                             onClick={() => { setSelectedTable(null); setTableRows(null); }}
                             className="text-xs text-slate-400 hover:text-slate-700 p-1 rounded hover:bg-slate-100 cursor-pointer"
-                            title="Đóng xem bảng"
                           >
                             <X className="w-4 h-4" />
                           </button>

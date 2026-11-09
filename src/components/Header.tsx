@@ -78,7 +78,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMyOrders, onOpenAdmin, onS
                   <button
                     onClick={onOpenAdmin}
                     className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-300 transition-colors shadow-xs cursor-pointer"
-                    title="Cổng Quản Trị Đơn Hàng"
                   >
                     <ShieldCheck className="w-4 h-4 text-amber-600" />
                     <span className="hidden sm:inline">Cổng Quản Trị OMS</span>
@@ -108,7 +107,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMyOrders, onOpenAdmin, onS
                   </div>
                   <button
                     onClick={logout}
-                    title="Đăng xuất"
+                    aria-label="Đăng xuất"
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />

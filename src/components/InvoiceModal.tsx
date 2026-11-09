@@ -29,7 +29,6 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({ order, onClose }) =>
         <button
           onClick={onClose}
           aria-label="Đóng hóa đơn"
-          title="Đóng hóa đơn"
           className="absolute top-2.5 right-2.5 z-40 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer shadow-xs print:hidden"
         >
           <X className="w-4 h-4" />

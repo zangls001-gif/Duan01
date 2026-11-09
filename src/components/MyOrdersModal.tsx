@@ -116,8 +116,8 @@ export const MyOrdersModal: React.FC<MyOrdersModalProps> = ({
             <button
               onClick={fetchMyOrders}
               disabled={isLoading}
+              aria-label="Tải lại đơn hàng"
               className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
-              title="Tải lại đơn hàng"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>

@@ -316,7 +316,6 @@ export const CustomerReviewsSection: React.FC = () => {
             }
           }}
           className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-800 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors text-base font-semibold select-none"
-          title="Trang trước"
           aria-label="Trang trước"
         >
           &lt;
@@ -366,7 +365,6 @@ export const CustomerReviewsSection: React.FC = () => {
             }
           }}
           className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-800 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors text-base font-semibold select-none"
-          title="Trang tiếp theo"
           aria-label="Trang tiếp theo"
         >
           &gt;
@@ -458,7 +456,7 @@ export const CustomerReviewsSection: React.FC = () => {
                                 <h4 className="font-bold text-sm text-slate-900 leading-tight">
                                   {rev.full_name}
                                 </h4>
-                                <span title="Khách hàng đã xác thực">
+                                <span aria-label="Khách hàng đã xác thực">
                                   <ShieldCheck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
                                 </span>
                               </div>
